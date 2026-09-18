@@ -954,7 +954,10 @@ def build_markdown_report(report: dict[str, object]) -> str:
             "",
             "![Cross-sectional decomposition](assets/lead_lag_decomposed_3m.svg)",
             "",
-            "| Signal | Pooled rho | Median monthly cross-sectional rho | Median within-market rho |",
+            (
+                "| Signal | Pooled rho | Median monthly cross-sectional rho | "
+                "Median within-market rho |"
+            ),
             "|---|---:|---:|---:|",
         ]
     )
@@ -1027,7 +1030,10 @@ def build_markdown_report(report: dict[str, object]) -> str:
             "",
             "## Candidate inflection periods",
             "",
-            "| Month | Composite shift score | ZHVI move | Inventory move | New-listing move | Market Heat move |",
+            (
+                "| Month | Composite shift score | ZHVI move | Inventory move | "
+                "New-listing move | Market Heat move |"
+            ),
             "|---|---:|---:|---:|---:|---:|",
         ]
     )
