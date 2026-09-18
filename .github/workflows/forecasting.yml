@@ -1,0 +1,59 @@
+name: Forecasting experiment
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Download live Zillow Research data
+        run: python -m src.ingestion.download
+
+      - name: Normalize data
+        run: python -m src.transformation.build_interim
+
+      - name: Build metro-only mart
+        run: python -m src.transformation.build_mart
+
+      - name: Run purged rolling-origin forecasting experiment
+        run: python -m src.forecasting.experiment
+
+      - name: Print forecast report
+        run: cat outputs/reports/forecast_report.md
+
+      - name: Upload forecasting artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: forecasting-experiment
+          path: |
+            outputs/reports/forecast_summary.json
+            outputs/reports/forecast_metrics.csv
+            outputs/reports/forecast_metrics_by_fold.csv
+            outputs/reports/forecast_metrics_by_cohort.csv
+            outputs/reports/forecast_predictions.parquet
+            outputs/reports/forecast_report.md
+            outputs/figures/forecast_mae.svg
+          retention-days: 14
