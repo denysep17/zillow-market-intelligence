@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="560" viewBox="0 0 1100 560">
+<rect width="1100" height="560" fill="#F7F8FA"/>
+<text x="55" y="52" font-family="Inter,Arial,sans-serif" font-size="29" font-weight="700" fill="#111827">Rolling out-of-time forecast error</text>
+<text x="55" y="80" font-family="Inter,Arial,sans-serif" font-size="14" fill="#667085">Mean absolute error · 3-month forward ZHVI growth · lower is better</text>
+<g font-family="Inter,Arial,sans-serif" font-size="14" fill="#344054">
+<text x="55" y="132">Full Elastic Net</text><rect x="250" y="111" width="340" height="28" rx="5" fill="#006AFF"/><text x="602" y="132" font-weight="600" fill="#101828">0.871 pp</text>
+<text x="55" y="194">Gradient boosting</text><rect x="250" y="173" width="354" height="28" rx="5" fill="#98A2B3"/><text x="616" y="194" font-weight="600" fill="#101828">0.907 pp</text>
+<text x="55" y="256">Price-only Ridge</text><rect x="250" y="235" width="394" height="28" rx="5" fill="#98A2B3"/><text x="656" y="256" font-weight="600" fill="#101828">1.010 pp</text>
+<text x="55" y="318">No change</text><rect x="250" y="297" width="464" height="28" rx="5" fill="#98A2B3"/><text x="726" y="318" font-weight="600" fill="#101828">1.188 pp</text>
+<text x="55" y="380">Trailing momentum</text><rect x="250" y="359" width="510" height="28" rx="5" fill="#98A2B3"/><text x="772" y="380" font-weight="600" fill="#101828">1.307 pp</text>
+<text x="55" y="442">Seasonal naive</text><rect x="250" y="421" width="700" height="28" rx="5" fill="#98A2B3"/><text x="962" y="442" font-weight="600" fill="#101828">1.793 pp</text>
+</g>
+<text x="55" y="510" font-family="Inter,Arial,sans-serif" font-size="13" fill="#667085">Elastic Net reduces MAE 13.8% vs. price-only Ridge and 33.4% vs. trailing momentum.</text>
+</svg>
