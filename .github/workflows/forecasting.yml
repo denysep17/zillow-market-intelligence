@@ -53,7 +53,12 @@ jobs:
             outputs/reports/forecast_metrics.csv
             outputs/reports/forecast_metrics_by_fold.csv
             outputs/reports/forecast_metrics_by_cohort.csv
+            outputs/reports/forecast_fold_winners.csv
+            outputs/reports/forecast_ablation.csv
             outputs/reports/forecast_predictions.parquet
+            outputs/reports/forecast_conformal_summary.json
+            outputs/reports/forecast_conformal_by_cohort.csv
+            outputs/reports/forecast_conformal_predictions.parquet
             outputs/reports/forecast_report.md
             outputs/figures/forecast_mae.svg
           retention-days: 14
