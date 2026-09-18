@@ -107,11 +107,14 @@ zillow-market-intelligence/
 ## Project milestones
 
 ### v0.1 — Data foundation
-- [ ] Confirm Zillow Research datasets and metric definitions
-- [ ] Build ingestion pipeline
-- [ ] Normalize metro-month data
-- [ ] Add schema and data-quality validation
-- [ ] Create analytical mart
+- [x] Lock initial Zillow Research source contract
+- [x] Build reproducible ingestion pipeline + SHA-256 download manifest
+- [x] Implement wide-to-long metro-month normalization
+- [x] Add schema and data-quality validation
+- [x] Implement canonical analytical mart builder
+- [x] Add coverage-audit report generator
+- [ ] Execute the full build against current Zillow releases and review coverage
+- [ ] Decide whether to add price cuts / new listings / sale-to-list before v0.2
 
 ### v0.2 — Market diagnostics
 - [ ] National and metro EDA
@@ -176,8 +179,28 @@ Performance will be analyzed globally and by:
 
 This is a research and portfolio project using public aggregate market data. It is not a Zillow internal system, does not use private Zillow product telemetry, and should not be interpreted as individualized financial or real-estate advice.
 
+## Reproduce the v0.1 data foundation
+
+```bash
+pip install -r requirements.txt
+python -m src.ingestion.download
+python -m src.transformation.build_interim
+python -m src.transformation.build_mart
+python -m src.validation.audit
+```
+
+Or run:
+
+```bash
+bash scripts/build_v01_data.sh
+```
+
+The raw downloads are not committed to Git. Each run records source URL, timestamp, file size, and SHA-256 hash in the local download manifest.
+
 ## Current status
 
-**Phase 0: repository and analytical contract established.**
+**v0.1 data-foundation implementation is complete.**
 
-Next: lock the Zillow Research source datasets, build the ingestion contract, and generate the first canonical metro-month table.
+The initial source contract is locked to five monthly metro-level Zillow Research series: ZHVI, ZORI, for-sale inventory, mean days to pending, and Market Heat Index.
+
+Next gate: execute the pipeline against the current files, review historical overlap/missingness, and only then decide whether additional signals such as price cuts, new listings, or sale-to-list ratio are justified before EDA and model development.
