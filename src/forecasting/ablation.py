@@ -17,6 +17,9 @@ from src.forecasting.models import elastic_net_model
 def feature_sets() -> dict[str, list[str]]:
     return {
         "price_only_elastic": list(PRICE_FEATURES),
+        "price_plus_rent": PRICE_FEATURES + RENT_FEATURES,
+        "price_plus_supply": PRICE_FEATURES + SUPPLY_FEATURES,
+        "price_plus_liquidity": PRICE_FEATURES + LIQUIDITY_FEATURES,
         "full": list(FULL_FEATURES),
         "full_without_rent": [
             feature for feature in FULL_FEATURES if feature not in RENT_FEATURES
