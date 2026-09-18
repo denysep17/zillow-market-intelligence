@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import json
 from html import escape
+import json
 from pathlib import Path
 
 import numpy as np
