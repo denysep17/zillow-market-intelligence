@@ -24,7 +24,25 @@ sources:
     geography: metro
     frequency: monthly
     value_type: count
-    role: supply_signal
+    role: supply_stock_signal
+
+  new_listings:
+    name: New Listings
+    metric: new_listings
+    url: https://files.zillowstatic.com/research/public_csvs/new_listings/Metro_new_listings_uc_sfrcondo_sm_month.csv
+    geography: metro
+    frequency: monthly
+    value_type: count
+    role: supply_flow_signal
+
+  price_cut_share:
+    name: Share of Listings With a Price Cut
+    metric: price_cut_share
+    url: https://files.zillowstatic.com/research/public_csvs/perc_listings_price_cut/Metro_perc_listings_price_cut_uc_sfrcondo_sm_month.csv
+    geography: metro
+    frequency: monthly
+    value_type: share
+    role: seller_pressure_signal
 
   days_to_pending:
     name: Mean Days to Pending
