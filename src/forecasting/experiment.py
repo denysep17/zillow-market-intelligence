@@ -103,6 +103,8 @@ def _metrics_from_predictions(predictions: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for model in MODEL_ORDER:
         metrics = regression_metrics(predictions[TARGET], predictions[model])
+        if model == "no_change":
+            metrics["directional_accuracy"] = np.nan
         rows.append({"model": model, **metrics})
     return pd.DataFrame(rows)
 
@@ -112,6 +114,8 @@ def _fold_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
     for fold, frame in predictions.groupby("fold"):
         for model in MODEL_ORDER:
             metrics = regression_metrics(frame[TARGET], frame[model])
+            if model == "no_change":
+                metrics["directional_accuracy"] = np.nan
             rows.append({"fold": int(fold), "model": model, **metrics})
     return pd.DataFrame(rows)
 
@@ -121,6 +125,8 @@ def _cohort_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
     for cohort, frame in predictions.groupby("size_cohort"):
         for model in MODEL_ORDER:
             metrics = regression_metrics(frame[TARGET], frame[model])
+            if model == "no_change":
+                metrics["directional_accuracy"] = np.nan
             rows.append(
                 {
                     "size_cohort": str(cohort),
@@ -157,6 +163,8 @@ def _relative_improvement(
 
 
 def _pct(value: float) -> str:
+    if not np.isfinite(value):
+        return "—"
     return f"{value:.2%}"
 
 
