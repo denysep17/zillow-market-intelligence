@@ -319,8 +319,8 @@ def _top_100_snapshot(
 
 
 def _svg_header(width: int, height: int, title: str, subtitle: str) -> list[str]:
-    escaped_title = html.escape(title)
-    escaped_subtitle = html.escape(subtitle)
+    escaped_title = escape(title)
+    escaped_subtitle = escape(subtitle)
     return [
         (
             f'<svg xmlns="http://www.w3.org/2000/svg" '
@@ -430,7 +430,7 @@ def write_signal_overview_svg(
         lines.append(
             f'<text x="{legend_x + 12}" y="620" '
             'font-family="Inter,Arial,sans-serif" font-size="13" '
-            f'fill="#344054">{html.escape(label)}</text>'
+            f'fill="#344054">{escape(label)}</text>'
         )
         legend_x += 170
 
@@ -498,7 +498,7 @@ def write_lead_lag_svg(
 
         lines.append(
             f'<text x="60" y="{y + 5}" font-family="Inter,Arial,sans-serif" '
-            f'font-size="15" fill="#344054">{html.escape(label)}</text>'
+            f'font-size="15" fill="#344054">{escape(label)}</text>'
         )
         lines.append(
             f'<rect x="{x:.1f}" y="{y - 13}" width="{length:.1f}" '
@@ -587,7 +587,7 @@ def write_market_matrix_svg(
         )
 
         if idx in label_ids:
-            label = html.escape(str(row["market_name"]).split(",")[0])
+            label = escape(str(row["market_name"]).split(",")[0])
             lines.append(
                 f'<text x="{x + 10:.1f}" y="{y - 9:.1f}" '
                 'font-family="Inter,Arial,sans-serif" font-size="12" '
