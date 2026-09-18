@@ -173,6 +173,8 @@ def build_markdown_report(
     ablation: pd.DataFrame,
     conformal_summary: dict[str, float],
     conformal_by_cohort: pd.DataFrame,
+    cohort_conformal_summary: dict[str, float],
+    cohort_conformal_by_cohort: pd.DataFrame,
 ) -> str:
     best = str(summary["best_model"])
     index = metrics.set_index("model")
@@ -317,6 +319,8 @@ def build_markdown_report(
                 "evaluated around the Elastic Net point forecast."
             ),
             "",
+            "### Global calibration",
+            "",
             "| Scope | Empirical coverage | Mean interval width |",
             "|---|---:|---:|",
             (
@@ -340,10 +344,41 @@ def build_markdown_report(
         [
             "",
             (
-                "The nominal target is 90% coverage. Because metro-month "
-                "observations are dependent across both geography and time, "
-                "coverage is reported empirically; this is not presented as a "
-                "formal iid conformal guarantee."
+                "A single global interval overcovers the larger Zillow-ranked "
+                "cohorts and undercovers rank-301+ metros, indicating "
+                "heteroskedastic uncertainty across market size."
+            ),
+            "",
+            "### Size-cohort conditional calibration",
+            "",
+            "| Scope | Empirical coverage | Mean interval width |",
+            "|---|---:|---:|",
+            (
+                f"| Overall | "
+                f"{_pct(float(cohort_conformal_summary['empirical_coverage']))} | "
+                f"{_pp(float(cohort_conformal_summary['mean_interval_width']))} |"
+            ),
+        ]
+    )
+
+    for _, row in cohort_conformal_by_cohort.iterrows():
+        lines.append(
+            (
+                f"| {row['size_cohort']} | "
+                f"{_pct(float(row['empirical_coverage']))} | "
+                f"{_pp(float(row['mean_interval_width']))} |"
+            )
+        )
+
+    lines.extend(
+        [
+            "",
+            (
+                "The nominal target is 90% coverage. Cohort-conditional "
+                "calibration allows interval width to adapt to observed market "
+                "heterogeneity. Because metro-month observations are dependent "
+                "across geography and time, coverage is reported empirically; "
+                "this is not presented as a formal iid conformal guarantee."
             ),
             "",
             "## Performance by Zillow size-rank cohort",
@@ -496,6 +531,18 @@ def run_experiment(
         conformal_predictions
     )
 
+    cohort_conformal_predictions = rolling_conformal_predictions(
+        labeled,
+        folds,
+        confidence=0.90,
+        calibration_months=6,
+        horizon_months=3,
+        conditional_on_cohort=True,
+    )
+    cohort_conformal_summary, cohort_conformal_by_cohort = interval_summary(
+        cohort_conformal_predictions
+    )
+
     best = _best_model(metrics)
     summary: dict[str, object] = {
         "target": TARGET,
@@ -520,7 +567,8 @@ def run_experiment(
         ),
         "ablation_best_feature_set": str(ablation.iloc[0]["feature_set"]),
         "ablation_best_mae": float(ablation.iloc[0]["mae"]),
-        "conformal": conformal_summary,
+        "conformal_global": conformal_summary,
+        "conformal_by_size_cohort": cohort_conformal_summary,
         "fold_winner_counts": {
             str(model): int(count)
             for model, count in fold_winners["model"].value_counts().items()
@@ -568,8 +616,20 @@ def run_experiment(
         reports / "forecast_conformal_by_cohort.csv",
         index=False,
     )
+    cohort_conformal_predictions.to_parquet(
+        reports / "forecast_cohort_conformal_predictions.parquet",
+        index=False,
+    )
+    cohort_conformal_by_cohort.to_csv(
+        reports / "forecast_cohort_conformal_by_cohort.csv",
+        index=False,
+    )
     (reports / "forecast_conformal_summary.json").write_text(
         json.dumps(conformal_summary, indent=2),
+        encoding="utf-8",
+    )
+    (reports / "forecast_cohort_conformal_summary.json").write_text(
+        json.dumps(cohort_conformal_summary, indent=2),
         encoding="utf-8",
     )
     (reports / "forecast_summary.json").write_text(
@@ -586,6 +646,8 @@ def run_experiment(
             ablation,
             conformal_summary,
             conformal_by_cohort,
+            cohort_conformal_summary,
+            cohort_conformal_by_cohort,
         ),
         encoding="utf-8",
     )
@@ -595,8 +657,10 @@ def run_experiment(
     print(metrics.to_string(index=False))
     print("\nFeature-family ablation:")
     print(ablation.to_string(index=False))
-    print("\nConformal interval summary:")
+    print("\nGlobal conformal interval summary:")
     print(json.dumps(conformal_summary, indent=2))
+    print("\nSize-cohort conformal interval summary:")
+    print(json.dumps(cohort_conformal_summary, indent=2))
     return summary
 
 
