@@ -6,11 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import ElasticNet, Ridge
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
 from src.features.model_table import (
     FULL_FEATURES,
@@ -18,10 +14,20 @@ from src.features.model_table import (
     TARGET,
     build_model_table,
 )
+from src.forecasting.ablation import run_feature_ablation
 from src.forecasting.evaluation import (
     ForecastFold,
     purged_rolling_origin_folds,
     regression_metrics,
+)
+from src.forecasting.models import (
+    elastic_net_model,
+    gradient_boosting_model,
+    ridge_price_model,
+)
+from src.forecasting.uncertainty import (
+    interval_summary,
+    rolling_conformal_predictions,
 )
 
 MODEL_ORDER = [
@@ -32,61 +38,6 @@ MODEL_ORDER = [
     "elastic_net_full",
     "gradient_boosting_full",
 ]
-
-
-def _ridge_price_model() -> Pipeline:
-    return Pipeline(
-        [
-            (
-                "imputer",
-                SimpleImputer(strategy="median", add_indicator=True),
-            ),
-            ("scaler", StandardScaler()),
-            ("model", Ridge(alpha=1.0)),
-        ]
-    )
-
-
-def _elastic_net_model() -> Pipeline:
-    return Pipeline(
-        [
-            (
-                "imputer",
-                SimpleImputer(strategy="median", add_indicator=True),
-            ),
-            ("scaler", StandardScaler()),
-            (
-                "model",
-                ElasticNet(
-                    alpha=0.0005,
-                    l1_ratio=0.20,
-                    max_iter=20_000,
-                    random_state=42,
-                ),
-            ),
-        ]
-    )
-
-
-def _gradient_boosting_model() -> Pipeline:
-    return Pipeline(
-        [
-            (
-                "imputer",
-                SimpleImputer(strategy="median", add_indicator=True),
-            ),
-            (
-                "model",
-                HistGradientBoostingRegressor(
-                    learning_rate=0.05,
-                    max_iter=250,
-                    max_leaf_nodes=31,
-                    l2_regularization=1.0,
-                    random_state=42,
-                ),
-            ),
-        ]
-    )
 
 
 def _fit_predict(
@@ -128,19 +79,19 @@ def _fold_predictions(
     output["trailing_momentum"] = validation["zhvi_growth_3m"].to_numpy()
 
     output["ridge_price"] = _fit_predict(
-        _ridge_price_model(),
+        ridge_price_model(),
         train,
         validation,
         PRICE_FEATURES,
     )
     output["elastic_net_full"] = _fit_predict(
-        _elastic_net_model(),
+        elastic_net_model(),
         train,
         validation,
         FULL_FEATURES,
     )
     output["gradient_boosting_full"] = _fit_predict(
-        _gradient_boosting_model(),
+        gradient_boosting_model(),
         train,
         validation,
         FULL_FEATURES,
@@ -180,6 +131,15 @@ def _cohort_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _fold_winners(fold_metrics: pd.DataFrame) -> pd.DataFrame:
+    winners = (
+        fold_metrics.sort_values(["fold", "mae", "model"])
+        .groupby("fold", as_index=False)
+        .first()
+    )
+    return winners[["fold", "model", "mae", "directional_accuracy"]]
+
+
 def _best_model(metrics: pd.DataFrame) -> str:
     eligible = metrics.loc[metrics["model"].ne("no_change")].copy()
     return str(eligible.sort_values("mae").iloc[0]["model"])
@@ -209,6 +169,10 @@ def build_markdown_report(
     metrics: pd.DataFrame,
     fold_metrics: pd.DataFrame,
     cohort_metrics: pd.DataFrame,
+    fold_winners: pd.DataFrame,
+    ablation: pd.DataFrame,
+    conformal_summary: dict[str, float],
+    conformal_by_cohort: pd.DataFrame,
 ) -> str:
     best = str(summary["best_model"])
     index = metrics.set_index("model")
@@ -255,7 +219,7 @@ def build_markdown_report(
                 f"**Lowest aggregate MAE:** `{best}`. Its MAE improvement "
                 f"versus trailing momentum is "
                 f"**{summary['improvement_vs_trailing']:.1%}**, and versus the "
-                f"price-only Ridge benchmark is "
+                "price-only Ridge benchmark is "
                 f"**{summary['improvement_vs_price_ridge']:.1%}**."
             ),
             "",
@@ -267,29 +231,120 @@ def build_markdown_report(
     if best == "gradient_boosting_full":
         lines.append(
             "The nonlinear full-feature model earns additional complexity on "
-            "aggregate MAE. The next gate is stability by fold and cohort, not "
-            "further model complexity."
+            "aggregate MAE. Stability and uncertainty remain the next gates."
         )
     elif best == "elastic_net_full":
         lines.append(
             "The regularized linear full-feature model is sufficient at this "
-            "stage; a more complex nonlinear model does not improve aggregate "
-            "MAE enough to justify itself."
+            "stage; gradient boosting does not improve aggregate MAE enough to "
+            "justify the added complexity."
         )
     elif best == "ridge_price":
         lines.append(
             "The price-only autoregressive benchmark is not beaten. Additional "
-            "market signals should not be claimed as useful until feature or "
-            "regime design produces genuine out-of-time lift."
+            "market signals are not promoted until they demonstrate genuine "
+            "out-of-time lift."
         )
     else:
         lines.append(
-            "A simple benchmark remains strongest. Model complexity is not "
-            "currently justified."
+            "A simple benchmark remains strongest. Additional model complexity "
+            "is not currently justified."
         )
 
     lines.extend(
         [
+            "",
+            "## Fold stability",
+            "",
+            "| Fold | Lowest-MAE model | MAE | Directional accuracy |",
+            "|---:|---|---:|---:|",
+        ]
+    )
+    for _, row in fold_winners.iterrows():
+        lines.append(
+            (
+                f"| {int(row['fold'])} | {row['model']} | "
+                f"{_pp(float(row['mae']))} | "
+                f"{_pct(float(row['directional_accuracy']))} |"
+            )
+        )
+
+    winner_counts = fold_winners["model"].value_counts()
+    winner_text = ", ".join(
+        f"{model}: {int(count)}"
+        for model, count in winner_counts.items()
+    )
+    lines.extend(
+        [
+            "",
+            (
+                f"Fold winners are not stable across time ({winner_text}). "
+                "Aggregate performance therefore does not imply one model is "
+                "uniformly strongest across market regimes."
+            ),
+            "",
+            "## Feature-family ablation",
+            "",
+            "| Feature set | Features | MAE | Directional accuracy |",
+            "|---|---:|---:|---:|",
+        ]
+    )
+
+    for _, row in ablation.iterrows():
+        lines.append(
+            (
+                f"| {row['feature_set']} | {int(row['feature_count'])} | "
+                f"{_pp(float(row['mae']))} | "
+                f"{_pct(float(row['directional_accuracy']))} |"
+            )
+        )
+
+    best_ablation = ablation.iloc[0]
+    lines.extend(
+        [
+            "",
+            (
+                f"Lowest ablation MAE is **{best_ablation['feature_set']}** "
+                f"({_pp(float(best_ablation['mae']))}). This test asks whether "
+                "rent, supply, or liquidity families provide incremental value "
+                "once evaluated out of time rather than selected by correlation."
+            ),
+            "",
+            "## Empirical prediction intervals",
+            "",
+            (
+                "A time-ordered split-conformal-style calibration layer is "
+                "evaluated around the Elastic Net point forecast."
+            ),
+            "",
+            "| Scope | Empirical coverage | Mean interval width |",
+            "|---|---:|---:|",
+            (
+                f"| Overall | "
+                f"{_pct(float(conformal_summary['empirical_coverage']))} | "
+                f"{_pp(float(conformal_summary['mean_interval_width']))} |"
+            ),
+        ]
+    )
+
+    for _, row in conformal_by_cohort.iterrows():
+        lines.append(
+            (
+                f"| {row['size_cohort']} | "
+                f"{_pct(float(row['empirical_coverage']))} | "
+                f"{_pp(float(row['mean_interval_width']))} |"
+            )
+        )
+
+    lines.extend(
+        [
+            "",
+            (
+                "The nominal target is 90% coverage. Because metro-month "
+                "observations are dependent across both geography and time, "
+                "coverage is reported empirically; this is not presented as a "
+                "formal iid conformal guarantee."
+            ),
             "",
             "## Performance by Zillow size-rank cohort",
             "",
@@ -316,14 +371,6 @@ def build_markdown_report(
     lines.extend(
         [
             "",
-            "## Fold stability",
-            "",
-            (
-                "A model is not promoted based only on pooled performance. "
-                "The fold-level output is retained to identify periods where "
-                "the ranking reverses or errors spike."
-            ),
-            "",
             "## Guardrails",
             "",
             "- All feature transformations are backward-looking at month t.",
@@ -332,24 +379,30 @@ def build_markdown_report(
                 "avoid training on labels that would not yet exist."
             ),
             (
-                "- Hyperparameters are intentionally fixed in this first "
-                "experiment; there is no full-sample tuning."
+                "- Hyperparameters are intentionally fixed in this experiment; "
+                "there is no full-sample tuning."
             ),
             (
-                "- Missing non-price features are imputed from the training "
-                "fold only, with missingness indicators added by the pipeline."
+                "- Missing features are imputed from the training fold only, "
+                "with missingness indicators added by the sklearn pipeline."
             ),
             (
-                "- Zillow historical revisions remain a vintage-data caveat "
+                "- Historical Zillow revisions remain a vintage-data caveat "
                 "for retrospective evaluation."
+            ),
+            (
+                "- Same-month market features assume the public monthly signal "
+                "is available by the scoring cutoff; publication-lag sensitivity "
+                "should be tested before a production claim."
             ),
             "",
             "## Next gate",
             "",
             (
-                "Inspect fold-level and cohort-level failure modes, then add "
-                "prediction intervals and feature-ablation tests before "
-                "promoting a model into the regime / early-warning layer."
+                "Use fold instability, ablation results, and uncertainty "
+                "coverage to define the regime-aware early-warning layer. "
+                "Do not add model complexity unless it solves an observed "
+                "failure mode."
             ),
         ]
     )
@@ -394,10 +447,11 @@ def _write_mae_svg(metrics: pd.DataFrame, path: Path) -> None:
             f'<rect x="{left}" y="{y - 14}" width="{bar_width:.1f}" '
             f'height="28" rx="5" fill="{color}"/>'
         )
+        value = float(row["mae"]) * 100
         lines.append(
             f'<text x="{left + bar_width + 10:.1f}" y="{y + 6}" '
             'font-family="Inter,Arial,sans-serif" font-size="13" '
-            f'font-weight="600" fill="#101828">{float(row["mae"]) * 100:.3f} pp</text>'
+            f'font-weight="600" fill="#101828">{value:.3f} pp</text>'
         )
 
     lines.append("</svg>")
@@ -427,6 +481,20 @@ def run_experiment(
     metrics = _metrics_from_predictions(predictions)
     fold_metrics = _fold_metrics(predictions)
     cohort_metrics = _cohort_metrics(predictions)
+    fold_winners = _fold_winners(fold_metrics)
+
+    ablation = run_feature_ablation(labeled, folds)
+
+    conformal_predictions = rolling_conformal_predictions(
+        labeled,
+        folds,
+        confidence=0.90,
+        calibration_months=6,
+        horizon_months=3,
+    )
+    conformal_summary, conformal_by_cohort = interval_summary(
+        conformal_predictions
+    )
 
     best = _best_model(metrics)
     summary: dict[str, object] = {
@@ -450,6 +518,13 @@ def run_experiment(
             best,
             "ridge_price",
         ),
+        "ablation_best_feature_set": str(ablation.iloc[0]["feature_set"]),
+        "ablation_best_mae": float(ablation.iloc[0]["mae"]),
+        "conformal": conformal_summary,
+        "fold_winner_counts": {
+            str(model): int(count)
+            for model, count in fold_winners["model"].value_counts().items()
+        },
         "fold_definitions": [
             {
                 "fold": fold.fold,
@@ -473,9 +548,29 @@ def run_experiment(
         reports / "forecast_metrics_by_cohort.csv",
         index=False,
     )
+    fold_winners.to_csv(
+        reports / "forecast_fold_winners.csv",
+        index=False,
+    )
+    ablation.to_csv(
+        reports / "forecast_ablation.csv",
+        index=False,
+    )
     predictions.to_parquet(
         reports / "forecast_predictions.parquet",
         index=False,
+    )
+    conformal_predictions.to_parquet(
+        reports / "forecast_conformal_predictions.parquet",
+        index=False,
+    )
+    conformal_by_cohort.to_csv(
+        reports / "forecast_conformal_by_cohort.csv",
+        index=False,
+    )
+    (reports / "forecast_conformal_summary.json").write_text(
+        json.dumps(conformal_summary, indent=2),
+        encoding="utf-8",
     )
     (reports / "forecast_summary.json").write_text(
         json.dumps(summary, indent=2),
@@ -487,6 +582,10 @@ def run_experiment(
             metrics,
             fold_metrics,
             cohort_metrics,
+            fold_winners,
+            ablation,
+            conformal_summary,
+            conformal_by_cohort,
         ),
         encoding="utf-8",
     )
@@ -494,6 +593,10 @@ def run_experiment(
 
     print(json.dumps(summary, indent=2))
     print(metrics.to_string(index=False))
+    print("\nFeature-family ablation:")
+    print(ablation.to_string(index=False))
+    print("\nConformal interval summary:")
+    print(json.dumps(conformal_summary, indent=2))
     return summary
 
 
