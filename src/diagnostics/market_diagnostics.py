@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import html
 import json
+from html import escape
 from pathlib import Path
 
 import numpy as np
@@ -85,35 +85,120 @@ def add_research_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _spearman_pair(frame: pd.DataFrame, x: str, y: str) -> dict[str, object]:
+LEAD_LAG_FEATURES = [
+    "zhvi_growth_3m",
+    "zori_growth_3m",
+    "inventory_growth_3m",
+    "new_listings_growth_3m",
+    "price_cut_change_3m",
+    "days_pending_change_3m",
+    "market_heat_change_3m",
+]
+
+
+def _spearman_value(
+    frame: pd.DataFrame,
+    x: str,
+    y: str,
+    min_n: int = 30,
+) -> float | None:
     pair = frame[[x, y]].replace([np.inf, -np.inf], np.nan).dropna()
-    if len(pair) < 30:
-        return {"feature": x, "n": int(len(pair)), "rho": None}
+    if len(pair) < min_n:
+        return None
 
     ranked_x = pair[x].rank(method="average")
     ranked_y = pair[y].rank(method="average")
     rho = ranked_x.corr(ranked_y)
-    return {"feature": x, "n": int(len(pair)), "rho": float(rho)}
+    if pd.isna(rho):
+        return None
+    return float(rho)
+
+
+def _spearman_pair(frame: pd.DataFrame, x: str, y: str) -> dict[str, object]:
+    pair = frame[[x, y]].replace([np.inf, -np.inf], np.nan).dropna()
+    rho = _spearman_value(frame, x, y)
+    return {"feature": x, "n": int(len(pair)), "rho": rho}
+
+
+def _correlation_summary(values: list[float]) -> dict[str, float | int | None]:
+    series = pd.Series(values, dtype="float64").dropna()
+    if series.empty:
+        return {
+            "count": 0,
+            "median": None,
+            "q25": None,
+            "q75": None,
+        }
+    return {
+        "count": int(len(series)),
+        "median": float(series.median()),
+        "q25": float(series.quantile(0.25)),
+        "q75": float(series.quantile(0.75)),
+    }
 
 
 def lead_lag_table(df: pd.DataFrame) -> list[dict[str, object]]:
-    features = [
-        "zhvi_growth_3m",
-        "zori_growth_3m",
-        "inventory_growth_3m",
-        "new_listings_growth_3m",
-        "price_cut_change_3m",
-        "days_pending_change_3m",
-        "market_heat_change_3m",
-    ]
     rows: list[dict[str, object]] = []
 
     for horizon in (1, 3, 6):
         target = f"zhvi_forward_growth_{horizon}m"
-        for feature in features:
+        for feature in LEAD_LAG_FEATURES:
             result = _spearman_pair(df, feature, target)
             result["horizon_months"] = horizon
             rows.append(result)
+
+    return rows
+
+
+def lead_lag_decomposition(df: pd.DataFrame) -> list[dict[str, object]]:
+    """Decompose pooled association into within-month and within-market views.
+
+    The within-month summary reduces common macro-time confounding by asking
+    whether metros with relatively stronger signals in the same month also
+    have relatively stronger or weaker forward ZHVI momentum.
+
+    The within-market summary asks whether a signal tends to move with future
+    momentum over time inside the same metro.
+    """
+    rows: list[dict[str, object]] = []
+
+    for horizon in (1, 3, 6):
+        target = f"zhvi_forward_growth_{horizon}m"
+
+        for feature in LEAD_LAG_FEATURES:
+            pooled = _spearman_pair(df, feature, target)
+
+            monthly_values: list[float] = []
+            for _, group in df.groupby("month", sort=False):
+                rho = _spearman_value(group, feature, target, min_n=30)
+                if rho is not None:
+                    monthly_values.append(rho)
+
+            market_values: list[float] = []
+            for _, group in df.groupby("market_id", sort=False):
+                rho = _spearman_value(group, feature, target, min_n=24)
+                if rho is not None:
+                    market_values.append(rho)
+
+            monthly = _correlation_summary(monthly_values)
+            market = _correlation_summary(market_values)
+
+            rows.append(
+                {
+                    "feature": feature,
+                    "horizon_months": horizon,
+                    "pooled_n": pooled["n"],
+                    "pooled_rho": pooled["rho"],
+                    "monthly_cross_section_count": monthly["count"],
+                    "monthly_cross_section_median_rho": monthly["median"],
+                    "monthly_cross_section_q25_rho": monthly["q25"],
+                    "monthly_cross_section_q75_rho": monthly["q75"],
+                    "within_market_count": market["count"],
+                    "within_market_median_rho": market["median"],
+                    "within_market_q25_rho": market["q25"],
+                    "within_market_q75_rho": market["q75"],
+                }
+            )
 
     return rows
 
@@ -523,6 +608,99 @@ def write_lead_lag_svg(
     Path(path).write_text(_svg_footer(lines), encoding="utf-8")
 
 
+def write_lead_lag_decomposition_svg(
+    decomposition: list[dict[str, object]],
+    path: str | Path,
+) -> None:
+    rows = [
+        row
+        for row in decomposition
+        if row["horizon_months"] == 3
+        and row["monthly_cross_section_median_rho"] is not None
+    ]
+    rows = sorted(
+        rows,
+        key=lambda row: abs(float(row["monthly_cross_section_median_rho"])),
+        reverse=True,
+    )
+
+    labels = {
+        "zhvi_growth_3m": "Price momentum",
+        "zori_growth_3m": "Rent momentum",
+        "inventory_growth_3m": "Inventory growth",
+        "new_listings_growth_3m": "New-listing growth",
+        "price_cut_change_3m": "Price-cut change",
+        "days_pending_change_3m": "Days-pending change",
+        "market_heat_change_3m": "Market-heat change",
+    }
+
+    width, height = 1200, 650
+    center, max_half = 700, 350
+    top, row_gap = 145, 62
+    max_abs = max(
+        max(
+            abs(float(row["monthly_cross_section_q25_rho"])),
+            abs(float(row["monthly_cross_section_q75_rho"])),
+        )
+        for row in rows
+    )
+    max_abs = max(max_abs, 0.05)
+
+    lines = _svg_header(
+        width,
+        height,
+        "Cross-sectional signal strength inside the same month",
+        "Median monthly Spearman rho with forward 3-month ZHVI growth; "
+        "whiskers show the interquartile range across months.",
+    )
+    lines.append(
+        f'<line x1="{center}" y1="125" x2="{center}" y2="590" '
+        'stroke="#98A2B3" stroke-width="1.5"/>'
+    )
+
+    for idx, row in enumerate(rows):
+        median = float(row["monthly_cross_section_median_rho"])
+        q25 = float(row["monthly_cross_section_q25_rho"])
+        q75 = float(row["monthly_cross_section_q75_rho"])
+        y = top + idx * row_gap
+
+        x25 = center + q25 / max_abs * max_half
+        x75 = center + q75 / max_abs * max_half
+        xm = center + median / max_abs * max_half
+        label = labels.get(str(row["feature"]), str(row["feature"]))
+        color = "#006AFF" if median >= 0 else "#D92D20"
+
+        lines.append(
+            f'<text x="60" y="{y + 5}" font-family="Inter,Arial,sans-serif" '
+            f'font-size="15" fill="#344054">{escape(label)}</text>'
+        )
+        lines.append(
+            f'<line x1="{x25:.1f}" y1="{y}" x2="{x75:.1f}" y2="{y}" '
+            'stroke="#98A2B3" stroke-width="6" stroke-linecap="round"/>'
+        )
+        lines.append(
+            f'<circle cx="{xm:.1f}" cy="{y}" r="8" fill="{color}" '
+            'stroke="#FFFFFF" stroke-width="2"/>'
+        )
+        value_x = xm + 14 if median >= 0 else xm - 14
+        anchor = "start" if median >= 0 else "end"
+        lines.append(
+            f'<text x="{value_x:.1f}" y="{y + 5}" text-anchor="{anchor}" '
+            'font-family="Inter,Arial,sans-serif" font-size="12" '
+            f'font-weight="600" fill="#101828">{median:+.3f}</text>'
+        )
+
+    lines.append(
+        '<text x="345" y="620" font-family="Inter,Arial,sans-serif" '
+        'font-size="12" fill="#667085">Lower future momentum</text>'
+    )
+    lines.append(
+        '<text x="865" y="620" font-family="Inter,Arial,sans-serif" '
+        'font-size="12" fill="#667085">Higher future momentum</text>'
+    )
+    Path(path).write_text(_svg_footer(lines), encoding="utf-8")
+
+
 def write_market_matrix_svg(
     df: pd.DataFrame,
     latest_month: pd.Timestamp,
@@ -651,6 +829,21 @@ def build_markdown_report(report: dict[str, object]) -> str:
     lead_3m["abs_rho"] = lead_3m["rho"].abs()
     strongest = lead_3m.sort_values("abs_rho", ascending=False).iloc[0]
 
+    decomposition = pd.DataFrame(report["lead_lag_decomposition"])
+    decomp_3m = decomposition.loc[
+        decomposition["horizon_months"].eq(3)
+    ].dropna(subset=["monthly_cross_section_median_rho"])
+    incremental = decomp_3m.loc[
+        ~decomp_3m["feature"].eq("zhvi_growth_3m")
+    ].copy()
+    incremental["abs_monthly_rho"] = incremental[
+        "monthly_cross_section_median_rho"
+    ].abs()
+    strongest_incremental = incremental.sort_values(
+        "abs_monthly_rho",
+        ascending=False,
+    ).iloc[0]
+
     lines = [
         "# Market Diagnostics — live Zillow data",
         "",
@@ -687,8 +880,18 @@ def build_markdown_report(report: dict[str, object]) -> str:
         ),
         "",
         (
-            "These correlations are used to prioritize hypotheses for formal "
-            "out-of-time modeling. They are not causal estimates."
+            "After separating the panel month by month, the strongest "
+            "non-price signal is **"
+            f"{strongest_incremental['feature']}** with a median monthly "
+            "cross-sectional rho of **"
+            f"{strongest_incremental['monthly_cross_section_median_rho']:+.3f}**."
+        ),
+        "",
+        (
+            "The cross-sectional decomposition matters because pooled panel "
+            "correlations can mix market differences with shared macro-time "
+            "effects. These diagnostics prioritize hypotheses for formal "
+            "out-of-time modeling; they are not causal estimates."
         ),
         "",
         "## Inflection candidates",
@@ -732,6 +935,7 @@ def run_market_diagnostics(
         "latest_snapshot": latest_snapshot(research),
         "cohorts": cohort_snapshot(research, latest_month),
         "lead_lag": lead_lag_table(research),
+        "lead_lag_decomposition": lead_lag_decomposition(research),
         "seasonality": seasonality_table(research),
         "inflection_candidates": inflection_candidates(research),
         "top_100_market_extremes": _market_extremes(
@@ -762,6 +966,10 @@ def run_market_diagnostics(
     write_lead_lag_svg(
         report["lead_lag"],
         figures / "lead_lag_3m.svg",
+    )
+    write_lead_lag_decomposition_svg(
+        report["lead_lag_decomposition"],
+        figures / "lead_lag_decomposed_3m.svg",
     )
     write_market_matrix_svg(
         research,
