@@ -1,0 +1,22 @@
+project:
+  name: zillow-market-intelligence
+  geography: metro
+  frequency: monthly
+
+forecasting:
+  horizon_months: 3
+  target: zhvi_forward_growth_3m
+  random_seed: 42
+
+validation:
+  strategy: rolling_origin
+  min_train_months: 36
+
+data:
+  raw_dir: data/raw
+  interim_dir: data/interim
+  processed_dir: data/processed
+
+monitoring:
+  drift_window_months: 12
+  alert_min_confidence: 0.80
