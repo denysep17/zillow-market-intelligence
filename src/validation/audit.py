@@ -6,6 +6,16 @@ from pathlib import Path
 
 import pandas as pd
 
+CORE_METRICS = [
+    "zhvi",
+    "zori",
+    "inventory",
+    "new_listings",
+    "price_cut_share",
+    "days_to_pending",
+    "market_heat",
+]
+
 
 def longest_missing_run(values: pd.Series) -> int:
     """Return the longest consecutive run of missing observations."""
@@ -60,15 +70,20 @@ def coverage_by_year(df: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
 
     for year, frame in data.groupby("year"):
+        denominator = max(
+            frame[["market_id", "month"]].drop_duplicates().shape[0],
+            1,
+        )
         for metric in metrics:
             observed = frame.loc[frame[metric].notna()]
+            numerator = observed[["market_id", "month"]].drop_duplicates().shape[0]
             rows.append(
                 {
                     "year": int(year),
                     "metric": metric,
                     "observations": int(len(observed)),
                     "markets": int(observed["market_id"].nunique()),
-                    "coverage_rate": float(observed[["market_id", "month"]].drop_duplicates().shape[0] / max(frame[["market_id", "month"]].drop_duplicates().shape[0], 1)),
+                    "coverage_rate": float(numerator / denominator),
                 }
             )
 
@@ -80,11 +95,7 @@ def build_audit(
     output_dir: str | Path = "outputs/reports",
 ) -> None:
     mart = pd.read_parquet(mart_path)
-    metrics = [
-        c
-        for c in ["zhvi", "zori", "inventory", "days_to_pending", "market_heat"]
-        if c in mart.columns
-    ]
+    metrics = [metric for metric in CORE_METRICS if metric in mart.columns]
 
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)

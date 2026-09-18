@@ -9,7 +9,6 @@ import pandas as pd
 from src.ingestion.catalog import load_source_catalog
 from src.validation.contracts import assert_unique_market_month
 
-
 JOIN_KEYS = ["market_id", "month"]
 DESCRIPTIVE_COLUMNS = ["market_name", "region_type", "state_name", "size_rank"]
 
@@ -33,9 +32,19 @@ def build_market_month_mart(
         frames.append(frame[keep])
 
     mart = reduce(
-        lambda left, right: left.merge(right, on=JOIN_KEYS, how="outer", validate="one_to_one"),
+        lambda left, right: left.merge(
+            right,
+            on=JOIN_KEYS,
+            how="outer",
+            validate="one_to_one",
+        ),
         frames,
     )
+    # Zillow "Metro" files also include a national United States aggregate row.
+    # The canonical modeling mart is metro-only; keep national benchmarks separate.
+    if "region_type" in mart.columns:
+        mart = mart.loc[mart["region_type"].eq("msa")].copy()
+
     mart = mart.sort_values(JOIN_KEYS).reset_index(drop=True)
     assert_unique_market_month(mart)
 
