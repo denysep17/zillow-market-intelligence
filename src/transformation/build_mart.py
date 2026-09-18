@@ -40,6 +40,11 @@ def build_market_month_mart(
         ),
         frames,
     )
+    # Zillow "Metro" files also include a national United States aggregate row.
+    # The canonical modeling mart is metro-only; keep national benchmarks separate.
+    if "region_type" in mart.columns:
+        mart = mart.loc[mart["region_type"].eq("msa")].copy()
+
     mart = mart.sort_values(JOIN_KEYS).reset_index(drop=True)
     assert_unique_market_month(mart)
 
