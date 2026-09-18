@@ -113,8 +113,11 @@ zillow-market-intelligence/
 - [x] Add schema and data-quality validation
 - [x] Implement canonical analytical mart builder
 - [x] Add coverage-audit report generator
-- [ ] Execute the full build against current Zillow releases and review coverage
-- [ ] Decide whether to add price cuts / new listings / sale-to-list before v0.2
+- [x] Execute the full build against current Zillow releases and review coverage
+- [x] Promote price-cut share and new listings after live coverage audit
+- [x] Keep sale-to-list and affordability as optional/contextual signals
+- [x] Validate temporal alignment and document revision-vintage leakage
+- [x] Publish final v0.1 data-audit report
 
 ### v0.2 — Market diagnostics
 - [ ] National and metro EDA
@@ -199,8 +202,10 @@ The raw downloads are not committed to Git. Each run records source URL, timesta
 
 ## Current status
 
-**v0.1 data-foundation implementation is complete.**
+**v0.1 Data Foundation: COMPLETE.**
 
-The initial source contract is locked to five monthly metro-level Zillow Research series: ZHVI, ZORI, for-sale inventory, mean days to pending, and Market Heat Index.
+The live audit produced a metro-only canonical panel with 286,080 market-month rows across 894 metros. The core signal set is now ZHVI, ZORI, inventory, new listings, price-cut share, mean days to pending, and Market Heat Index.
 
-Next gate: execute the pipeline against the current files, review historical overlap/missingness, and only then decide whether additional signals such as price cuts, new listings, or sale-to-list ratio are justified before EDA and model development.
+See [the final data audit](docs/data_audit_2026-09-18.md).
+
+Next: v0.2 Market Diagnostics — descriptive market structure, seasonality, metro cohorts, structural breaks, lead-lag research, and publication-quality visualizations before model development.
