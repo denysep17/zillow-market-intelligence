@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import argparse
-from html import escape
 import json
+from html import escape
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 
 CORE_METRICS = [
     "zhvi",
