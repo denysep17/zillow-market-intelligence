@@ -120,10 +120,12 @@ zillow-market-intelligence/
 - [x] Publish final v0.1 data-audit report
 
 ### v0.2 — Market diagnostics
-- [ ] National and metro EDA
-- [ ] Seasonality and structural-break analysis
-- [ ] Lead-lag exploration
-- [ ] Cohort and peer-market comparison
+- [x] Cross-market and metro EDA
+- [x] Seasonality and synchronized-shift analysis
+- [x] Pooled + decomposed lead-lag exploration
+- [x] Zillow size-rank cohort analysis
+- [x] Top-100 metro market matrix
+- [x] Lock feature hypotheses for forecasting
 
 ### v0.3 — Forecasting
 - [ ] Define leakage-safe feature set
@@ -202,10 +204,13 @@ The raw downloads are not committed to Git. Each run records source URL, timesta
 
 ## Current status
 
-**v0.1 Data Foundation: COMPLETE.**
+**v0.1 Data Foundation: COMPLETE.**  
+**v0.2 Market Diagnostics: COMPLETE.**
 
-The live audit produced a metro-only canonical panel with 286,080 market-month rows across 894 metros. The core signal set is now ZHVI, ZORI, inventory, new listings, price-cut share, mean days to pending, and Market Heat Index.
+The live market-diagnostics pipeline now covers cross-market trends, seasonality, Zillow size-rank cohorts, synchronized-shift candidates, pooled lead-lag screening, and a stronger within-month / within-market correlation decomposition.
 
-See [the final data audit](docs/data_audit_2026-09-18.md).
+Key empirical result: recent ZHVI momentum is the dominant baseline, while ZORI momentum is the strongest non-price signal that remains meaningful when metros are compared within the same month. Inventory, price cuts, and Market Heat appear more regime-sensitive than purely cross-sectional.
 
-Next: v0.2 Market Diagnostics — descriptive market structure, seasonality, metro cohorts, structural breaks, lead-lag research, and publication-quality visualizations before model development.
+See [the final data audit](docs/data_audit_2026-09-18.md) and [market diagnostics findings](docs/market_diagnostics_2026-09-18.md).
+
+Next: **v0.3 Forecasting** — build the leakage-safe feature table, establish naive and autoregressive baselines, then compare Elastic Net and gradient boosting under rolling-origin validation.
