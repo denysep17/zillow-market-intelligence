@@ -6,8 +6,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
-CORE_METRICS = ["zhvi", "zori", "inventory", "days_to_pending", "market_heat"]
+CORE_METRICS = [
+    "zhvi",
+    "zori",
+    "inventory",
+    "new_listings",
+    "price_cut_share",
+    "days_to_pending",
+    "market_heat",
+]
 
 
 def _month_gap_count(frame: pd.DataFrame, metric: str) -> dict[str, int]:
@@ -40,10 +47,16 @@ def _metric_summary(df: pd.DataFrame, metric: str) -> dict[str, object]:
     overlap = df["zhvi"].notna() & df[metric].notna()
     zhvi_rows = max(int(df["zhvi"].notna().sum()), 1)
 
+    first_month = None
+    last_month = None
+    if not observed.empty:
+        first_month = observed["month"].min().date().isoformat()
+        last_month = observed["month"].max().date().isoformat()
+
     return {
         "metric": metric,
-        "first_month": observed["month"].min().date().isoformat() if not observed.empty else None,
-        "last_month": observed["month"].max().date().isoformat() if not observed.empty else None,
+        "first_month": first_month,
+        "last_month": last_month,
         "markets": int(observed["market_id"].nunique()),
         "observations": int(len(observed)),
         "null_rate": float(df[metric].isna().mean()),
@@ -66,7 +79,7 @@ def run_final_audit(
 ) -> dict[str, object]:
     df = pd.read_parquet(mart_path)
     df["month"] = pd.to_datetime(df["month"])
-    metrics = [m for m in CORE_METRICS if m in df.columns]
+    metrics = [metric for metric in CORE_METRICS if metric in df.columns]
 
     metric_summaries = [_metric_summary(df, metric) for metric in metrics]
 
@@ -74,13 +87,19 @@ def run_final_audit(
     duplicate_count = int(df.duplicated(["market_id", "month"]).sum())
 
     common_last_month = min(
-        pd.to_datetime(df.loc[df[m].notna(), "month"]).max()
-        for m in metrics
+        pd.to_datetime(df.loc[df[metric].notna(), "month"]).max()
+        for metric in metrics
     )
     common_first_month = max(
-        pd.to_datetime(df.loc[df[m].notna(), "month"]).min()
-        for m in metrics
+        pd.to_datetime(df.loc[df[metric].notna(), "month"]).min()
+        for metric in metrics
     )
+
+    complete_first = None
+    complete_last = None
+    if not complete.empty:
+        complete_first = complete["month"].min().date().isoformat()
+        complete_last = complete["month"].max().date().isoformat()
 
     report = {
         "panel": {
@@ -94,8 +113,8 @@ def run_final_audit(
         "complete_case_panel": {
             "rows": int(len(complete)),
             "markets": int(complete["market_id"].nunique()),
-            "first_month": complete["month"].min().date().isoformat() if not complete.empty else None,
-            "last_month": complete["month"].max().date().isoformat() if not complete.empty else None,
+            "first_month": complete_first,
+            "last_month": complete_last,
         },
         "temporal_alignment": {
             "common_feature_window_start": common_first_month.date().isoformat(),
@@ -115,11 +134,15 @@ def run_final_audit(
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "final_data_audit.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    (out / "final_data_audit.json").write_text(
+        json.dumps(report, indent=2),
+        encoding="utf-8",
+    )
 
-    metric_df = pd.DataFrame(metric_summaries)
-    metric_df.to_csv(out / "metric_coverage_extremes.csv", index=False)
-
+    pd.DataFrame(metric_summaries).to_csv(
+        out / "metric_coverage_extremes.csv",
+        index=False,
+    )
     return report
 
 
