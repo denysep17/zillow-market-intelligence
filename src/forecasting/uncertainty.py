@@ -24,6 +24,28 @@ def conformal_quantile(
     return float(np.quantile(scores, level, method="higher"))
 
 
+def _cohort_radii(
+    calibration: pd.DataFrame,
+    residuals: np.ndarray,
+    confidence: float,
+    *,
+    min_group_size: int = 50,
+) -> tuple[float, dict[str, float]]:
+    global_radius = conformal_quantile(residuals, confidence)
+    calibration_scores = calibration[["size_cohort"]].copy()
+    calibration_scores["score"] = residuals
+
+    radii: dict[str, float] = {}
+    for cohort, frame in calibration_scores.groupby("size_cohort"):
+        scores = frame["score"].to_numpy()
+        if len(scores) < min_group_size:
+            radii[str(cohort)] = global_radius
+        else:
+            radii[str(cohort)] = conformal_quantile(scores, confidence)
+
+    return global_radius, radii
+
+
 def rolling_conformal_predictions(
     table: pd.DataFrame,
     folds: list[ForecastFold],
@@ -31,12 +53,17 @@ def rolling_conformal_predictions(
     confidence: float = 0.90,
     calibration_months: int = 6,
     horizon_months: int = 3,
+    conditional_on_cohort: bool = False,
 ) -> pd.DataFrame:
-    """Generate split-conformal-style intervals for each validation fold.
+    """Generate time-ordered empirical conformal-style forecast intervals.
 
-    Calibration is time-ordered and separated from proper training by the
-    target horizon. Because metro-month observations are dependent, empirical
-    coverage is reported rather than claiming exchangeability-based guarantees.
+    Calibration is separated from proper training by the target horizon. If
+    conditional_on_cohort is true, interval radii are estimated separately for
+    Zillow size-rank cohorts, with a global fallback for small groups.
+
+    Metro-month observations are dependent across geography and time, so the
+    project reports empirical coverage rather than claiming an iid conformal
+    coverage guarantee.
     """
     frames: list[pd.DataFrame] = []
 
@@ -70,13 +97,15 @@ def rolling_conformal_predictions(
         model = elastic_net_model()
         model.fit(proper_train[FULL_FEATURES], proper_train[TARGET])
 
-        calibration_prediction = model.predict(
-            calibration[FULL_FEATURES]
-        )
+        calibration_prediction = model.predict(calibration[FULL_FEATURES])
         residuals = np.abs(
             calibration[TARGET].to_numpy() - calibration_prediction
         )
-        radius = conformal_quantile(residuals, confidence)
+        global_radius, cohort_radii = _cohort_radii(
+            calibration,
+            residuals,
+            confidence,
+        )
 
         prediction = model.predict(validation[FULL_FEATURES])
         output = validation[
@@ -92,9 +121,21 @@ def rolling_conformal_predictions(
         ].copy()
         output["fold"] = fold.fold
         output["prediction"] = prediction
-        output["lower"] = prediction - radius
-        output["upper"] = prediction + radius
-        output["interval_radius"] = radius
+
+        if conditional_on_cohort:
+            output["interval_radius"] = (
+                output["size_cohort"]
+                .astype(str)
+                .map(cohort_radii)
+                .fillna(global_radius)
+            )
+            output["calibration_scope"] = "size_cohort"
+        else:
+            output["interval_radius"] = global_radius
+            output["calibration_scope"] = "global"
+
+        output["lower"] = output["prediction"] - output["interval_radius"]
+        output["upper"] = output["prediction"] + output["interval_radius"]
         output["covered"] = (
             output[TARGET].ge(output["lower"])
             & output[TARGET].le(output["upper"])
@@ -114,28 +155,24 @@ def interval_summary(
         predictions[TARGET],
         predictions["prediction"],
     )
+    width = predictions["upper"] - predictions["lower"]
     summary = {
         "n": float(len(predictions)),
         "empirical_coverage": float(predictions["covered"].mean()),
-        "mean_interval_width": float(
-            (predictions["upper"] - predictions["lower"]).mean()
-        ),
-        "median_interval_width": float(
-            (predictions["upper"] - predictions["lower"]).median()
-        ),
+        "mean_interval_width": float(width.mean()),
+        "median_interval_width": float(width.median()),
         "point_mae": float(point["mae"]),
     }
 
     rows: list[dict[str, object]] = []
     for cohort, frame in predictions.groupby("size_cohort"):
+        cohort_width = frame["upper"] - frame["lower"]
         rows.append(
             {
                 "size_cohort": str(cohort),
                 "n": int(len(frame)),
                 "empirical_coverage": float(frame["covered"].mean()),
-                "mean_interval_width": float(
-                    (frame["upper"] - frame["lower"]).mean()
-                ),
+                "mean_interval_width": float(cohort_width.mean()),
             }
         )
 
