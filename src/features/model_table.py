@@ -17,24 +17,37 @@ PRICE_FEATURES = [
     "log_size_rank",
 ]
 
-FULL_FEATURES = PRICE_FEATURES + [
+RENT_FEATURES = [
     "zori_growth_3m",
     "zori_growth_12m",
+    "zori_growth_3m_pctile",
+]
+
+SUPPLY_FEATURES = [
     "inventory_growth_3m",
     "inventory_growth_12m",
     "new_listings_growth_3m",
     "new_listings_growth_12m",
+    "inventory_growth_3m_pctile",
+]
+
+LIQUIDITY_FEATURES = [
     "price_cut_change_3m",
     "price_cut_change_12m",
     "days_pending_change_3m",
     "days_pending_change_12m",
     "market_heat_change_3m",
-    "zori_growth_3m_pctile",
-    "inventory_growth_3m_pctile",
     "price_cut_change_3m_pctile",
     "days_pending_change_3m_pctile",
     "market_heat_change_3m_pctile",
 ]
+
+FULL_FEATURES = (
+    PRICE_FEATURES
+    + RENT_FEATURES
+    + SUPPLY_FEATURES
+    + LIQUIDITY_FEATURES
+)
 
 
 def _pct_change(df: pd.DataFrame, column: str, periods: int) -> pd.Series:
