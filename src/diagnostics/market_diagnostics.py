@@ -823,18 +823,24 @@ def _market_extremes(
 
 def build_markdown_report(report: dict[str, object]) -> str:
     snapshot = report["latest_snapshot"]
-    lead = pd.DataFrame(report["lead_lag"])
-    lead_3m = lead.loc[lead["horizon_months"].eq(3)].dropna(subset=["rho"])
-    lead_3m["abs_rho"] = lead_3m["rho"].abs()
-    strongest = lead_3m.sort_values("abs_rho", ascending=False).iloc[0]
-
     decomposition = pd.DataFrame(report["lead_lag_decomposition"])
     decomp_3m = decomposition.loc[
         decomposition["horizon_months"].eq(3)
-    ].dropna(subset=["monthly_cross_section_median_rho"])
+    ].copy()
+
+    feature_labels = {
+        "zhvi_growth_3m": "Price momentum",
+        "zori_growth_3m": "Rent momentum",
+        "inventory_growth_3m": "Inventory growth",
+        "new_listings_growth_3m": "New-listing growth",
+        "price_cut_change_3m": "Price-cut change",
+        "days_pending_change_3m": "Days-pending change",
+        "market_heat_change_3m": "Market-heat change",
+    }
+
     incremental = decomp_3m.loc[
         ~decomp_3m["feature"].eq("zhvi_growth_3m")
-    ].copy()
+    ].dropna(subset=["monthly_cross_section_median_rho"]).copy()
     incremental["abs_monthly_rho"] = incremental[
         "monthly_cross_section_median_rho"
     ].abs()
@@ -850,66 +856,259 @@ def build_markdown_report(report: dict[str, object]) -> str:
         "",
         (
             f"Research window: **{report['research_window']['start']} to "
-            f"{report['research_window']['end']}**. The canonical mart remains "
-            "metro-only."
+            f"{report['research_window']['end']}** across "
+            f"**{int(report['research_window']['markets']):,} metros**. "
+            "The canonical mart is metro-only."
         ),
+        "",
+        "![Cross-market signal trajectories](assets/market_signal_overview.svg)",
         "",
         "## Latest cross-market snapshot",
         "",
+        "| Metric | Median across available metros |",
+        "|---|---:|",
         (
-            f"As of **{snapshot['month']}**, median 12-month ZHVI growth across "
-            f"available metros is **{snapshot['median_zhvi_growth_12m']:.1%}**; "
-            f"median 12-month inventory growth is "
-            f"**{snapshot['median_inventory_growth_12m']:.1%}**."
+            f"| ZHVI growth, 3 months | "
+            f"{snapshot['median_zhvi_growth_3m']:.1%} |"
+        ),
+        (
+            f"| ZHVI growth, 12 months | "
+            f"{snapshot['median_zhvi_growth_12m']:.1%} |"
+        ),
+        (
+            f"| ZORI growth, 12 months | "
+            f"{snapshot['median_zori_growth_12m']:.1%} |"
+        ),
+        (
+            f"| Inventory growth, 12 months | "
+            f"{snapshot['median_inventory_growth_12m']:.1%} |"
+        ),
+        (
+            f"| New-listing growth, 12 months | "
+            f"{snapshot['median_new_listings_growth_12m']:.1%} |"
+        ),
+        (
+            f"| Price-cut share | "
+            f"{snapshot['median_price_cut_share']:.1%} |"
+        ),
+        (
+            f"| Days to pending | "
+            f"{snapshot['median_days_to_pending']:.0f} days |"
+        ),
+        (
+            f"| Market Heat Index | "
+            f"{snapshot['median_market_heat']:.0f} |"
         ),
         "",
         (
-            f"Median price-cut share is **{snapshot['median_price_cut_share']:.1%}** "
-            f"and median days to pending is "
-            f"**{snapshot['median_days_to_pending']:.0f} days**."
+            "The current cross-market median is therefore not a single "
+            "directional story: home values and rents remain positive on a "
+            "12-month basis while inventory is also expanding and listing "
+            "friction remains material."
         ),
         "",
-        "## Lead-lag screen",
+        "## Metro-size heterogeneity",
         "",
-        (
-            "The strongest pooled exploratory association with forward "
-            f"3-month ZHVI growth is **{strongest['feature']}** "
-            f"(Spearman rho = **{strongest['rho']:+.3f}**, "
-            f"n = {int(strongest['n']):,})."
-        ),
-        "",
-        (
-            "After separating the panel month by month, the strongest "
-            "non-price signal is **"
-            f"{strongest_incremental['feature']}** with a median monthly "
-            "cross-sectional rho of **"
-            f"{strongest_incremental['monthly_cross_section_median_rho']:+.3f}**."
-        ),
-        "",
-        (
-            "The cross-sectional decomposition matters because pooled panel "
-            "correlations can mix market differences with shared macro-time "
-            "effects. These diagnostics prioritize hypotheses for formal "
-            "out-of-time modeling; they are not causal estimates."
-        ),
-        "",
-        "## Inflection candidates",
-        "",
-        (
-            "The report also flags months with unusually large synchronized "
-            "moves across cross-market median ZHVI, inventory, new listings, "
-            "and Market Heat. These are candidate regime-change periods for "
-            "deeper structural-break analysis, not pre-labeled events."
-        ),
-        "",
-        "## Next analytical gate",
-        "",
-        (
-            "Use these diagnostics to lock the feature hypotheses, define metro "
-            "cohorts, and specify the baseline forecasting experiment before "
-            "training any nonlinear model."
-        ),
+        "| Zillow size-rank cohort | Metros | Median 12M ZHVI | Median 12M inventory |",
+        "|---|---:|---:|---:|",
     ]
+
+    cohort_order = ["top_100", "rank_101_300", "rank_301_plus"]
+    cohorts = {row["cohort"]: row for row in report["cohorts"]}
+    for cohort in cohort_order:
+        row = cohorts.get(cohort)
+        if row is None:
+            continue
+        label = {
+            "top_100": "Top 100",
+            "rank_101_300": "Ranks 101–300",
+            "rank_301_plus": "Rank 301+",
+        }[cohort]
+        lines.append(
+            (
+                f"| {label} | {int(row['markets']):,} | "
+                f"{row['median_zhvi_growth_12m']:.1%} | "
+                f"{row['median_inventory_growth_12m']:.1%} |"
+            )
+        )
+
+    lines.extend(
+        [
+            "",
+            (
+                "At the latest snapshot, larger metros show weaker median "
+                "12-month home-value growth than smaller Zillow-ranked metros. "
+                "That is a strong reason to evaluate model error by market-size "
+                "cohort rather than rely on one global metric."
+            ),
+            "",
+            "## Lead-lag diagnostics",
+            "",
+            "![Pooled lead-lag screen](assets/lead_lag_3m.svg)",
+            "",
+            (
+                "Pooled panel correlations are useful for screening, but they "
+                "can mix true within-market signal with shared macro-time "
+                "effects and persistent differences between metros."
+            ),
+            "",
+            "![Cross-sectional decomposition](assets/lead_lag_decomposed_3m.svg)",
+            "",
+            "| Signal | Pooled rho | Median monthly cross-sectional rho | Median within-market rho |",
+            "|---|---:|---:|---:|",
+        ]
+    )
+
+    ordered = decomp_3m.copy()
+    ordered["sort_key"] = ordered[
+        "monthly_cross_section_median_rho"
+    ].abs()
+    ordered = ordered.sort_values("sort_key", ascending=False)
+
+    for _, row in ordered.iterrows():
+        label = feature_labels.get(str(row["feature"]), str(row["feature"]))
+        lines.append(
+            (
+                f"| {label} | {row['pooled_rho']:+.3f} | "
+                f"{row['monthly_cross_section_median_rho']:+.3f} | "
+                f"{row['within_market_median_rho']:+.3f} |"
+            )
+        )
+
+    strongest_label = feature_labels.get(
+        str(strongest_incremental["feature"]),
+        str(strongest_incremental["feature"]),
+    )
+    lines.extend(
+        [
+            "",
+            (
+                f"**Key result:** after controlling for shared month effects by "
+                f"ranking metros within the same month, **{strongest_label}** "
+                "is the strongest non-price signal in the current screen "
+                f"(median monthly rho "
+                f"**{strongest_incremental['monthly_cross_section_median_rho']:+.3f}**)."
+            ),
+            "",
+            (
+                "Inventory growth, price-cut changes, and Market Heat show a "
+                "different pattern: their pooled or within-market associations "
+                "are materially stronger than their same-month cross-sectional "
+                "associations. That suggests they may be more useful as "
+                "within-market regime indicators than as simple cross-sectional "
+                "ranking features."
+            ),
+            "",
+            "New-listing growth is weak as a standalone linear signal in this "
+            "screen, so it should earn its place through interactions, regime "
+            "detection, or out-of-time incremental lift rather than correlation.",
+            "",
+            "## Latest major-metro matrix",
+            "",
+            "![Top-100 metro market matrix](assets/latest_market_matrix.svg)",
+            "",
+            (
+                "The top-100 metro matrix compares 12-month inventory growth "
+                "with three-month ZHVI momentum. It is designed for product "
+                "triage: metros in different quadrants can have similar price "
+                "outcomes for very different supply conditions."
+            ),
+            "",
+            "## Seasonality",
+            "",
+            (
+                "The raw monthly listing signals are strongly seasonal. Median "
+                "new listings rise sharply in spring and contract into year-end; "
+                "inventory and price-cut behavior also show repeatable calendar "
+                "patterns. Modeling should therefore prefer year-over-year, "
+                "seasonally normalized, or explicitly calendar-adjusted "
+                "features over naive month-over-month levels."
+            ),
+            "",
+            "## Candidate inflection periods",
+            "",
+            "| Month | Composite shift score | ZHVI move | Inventory move | New-listing move | Market Heat move |",
+            "|---|---:|---:|---:|---:|---:|",
+        ]
+    )
+
+    for row in report["inflection_candidates"][:5]:
+        lines.append(
+            (
+                f"| {row['month'][:7]} | {row['composite_shift']:.2f} | "
+                f"{row['zhvi_move']:.1%} | {row['inventory_move']:.1%} | "
+                f"{row['new_listings_move']:.1%} | "
+                f"{row['market_heat_move']:+.1f} |"
+            )
+        )
+
+    lines.extend(
+        [
+            "",
+            (
+                "These are synchronized movement candidates, not pre-labeled "
+                "structural breaks. They are useful windows for later regime "
+                "analysis and model stress testing."
+            ),
+            "",
+            "## Feature hypotheses locked for v0.3",
+            "",
+            (
+                "1. **Price momentum is the required baseline.** Any ML model "
+                "must beat an autoregressive price-only benchmark out of time."
+            ),
+            (
+                "2. **Rent momentum is the highest-priority incremental "
+                "cross-sectional signal.** It remains positive after the "
+                "within-month decomposition."
+            ),
+            (
+                "3. **Inventory, price cuts, and Market Heat are "
+                "regime-sensitive signals.** Their value should be tested "
+                "through lags, changes, interactions, and market-relative "
+                "normalization rather than raw pooled correlation."
+            ),
+            (
+                "4. **Days to pending is a secondary liquidity signal** with a "
+                "consistent negative within-market relationship to forward "
+                "price momentum."
+            ),
+            (
+                "5. **New listings remains conditional.** It stays in the "
+                "research feature set, but must demonstrate incremental lift "
+                "or regime usefulness before entering the final model."
+            ),
+            "",
+            "## Statistical guardrails",
+            "",
+            (
+                "- These are descriptive and predictive diagnostics, not causal "
+                "estimates."
+            ),
+            (
+                "- Zillow historical revisions remain a vintage-data limitation "
+                "for retrospective backtests."
+            ),
+            (
+                "- Feature selection will be based on rolling out-of-time "
+                "performance, not full-sample correlation."
+            ),
+            (
+                "- Model evaluation will be segmented by metro-size cohort and "
+                "market regime to expose heterogeneous failure modes."
+            ),
+            "",
+            "## v0.3 experiment specification",
+            "",
+            (
+                "Next: build a leakage-safe modeling table and compare "
+                "**seasonal naive / persistence / autoregressive price-only / "
+                "Elastic Net / gradient boosting** using rolling-origin "
+                "validation for the three-month forward ZHVI target."
+            ),
+        ]
+    )
+
     return "\n".join(lines) + "\n"
 
 
