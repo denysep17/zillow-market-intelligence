@@ -220,3 +220,54 @@ def model_health_mae() -> go.Figure:
         yaxis={"categoryorder": "total ascending"},
     )
     return fig
+
+
+def driver_contributions(drivers: pd.DataFrame) -> go.Figure:
+    labels = {
+        "zhvi_growth_1m": "ZHVI momentum · 1M",
+        "zhvi_growth_3m": "ZHVI momentum · 3M",
+        "zhvi_growth_6m": "ZHVI momentum · 6M",
+        "zhvi_growth_12m": "ZHVI momentum · 12M",
+        "zhvi_volatility_12m": "ZHVI volatility · 12M",
+        "zori_growth_3m": "Rent momentum · 3M",
+        "zori_growth_12m": "Rent momentum · 12M",
+        "inventory_growth_3m": "Inventory growth · 3M",
+        "inventory_growth_12m": "Inventory growth · 12M",
+        "new_listings_growth_3m": "New listings · 3M",
+        "new_listings_growth_12m": "New listings · 12M",
+        "price_cut_change_3m": "Price-cut change · 3M",
+        "price_cut_change_12m": "Price-cut change · 12M",
+        "days_pending_change_3m": "Days pending change · 3M",
+        "days_pending_change_12m": "Days pending change · 12M",
+        "market_heat_change_3m": "Market Heat change · 3M",
+        "zori_growth_3m_pctile": "Rent percentile · 3M",
+        "inventory_growth_3m_pctile": "Inventory percentile · 3M",
+        "price_cut_change_3m_pctile": "Price-cut percentile · 3M",
+        "days_pending_change_3m_pctile": "Days-pending percentile · 3M",
+        "market_heat_change_3m_pctile": "Market Heat percentile · 3M",
+        "month_sin": "Calendar seasonality · sin",
+        "month_cos": "Calendar seasonality · cos",
+        "log_size_rank": "Market size rank",
+    }
+
+    frame = drivers.copy()
+    frame["label"] = frame["feature"].map(labels).fillna(frame["feature"])
+
+    fig = px.bar(
+        frame,
+        x="contribution",
+        y="label",
+        orientation="h",
+        labels={
+            "contribution": "Contribution to 3M forecast",
+            "label": "",
+        },
+    )
+    fig.add_vline(x=0, line_color="#98A2B3", line_width=1)
+    fig.update_layout(
+        height=390,
+        margin=dict(l=20, r=20, t=20, b=20),
+        showlegend=False,
+    )
+    fig.update_xaxes(tickformat=".2%")
+    return fig
