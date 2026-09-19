@@ -40,23 +40,42 @@ def _fit_latest_forecast(table: pd.DataFrame) -> tuple[pd.Timestamp, pd.DataFram
     labeled = table.loc[table[TARGET].notna()].copy()
     training_end = labeled["month"].max()
 
-    model = elastic_net_model()
-    model.fit(labeled[FULL_FEATURES], labeled[TARGET])
+    label_periods = pd.PeriodIndex(
+        labeled["month"].dt.to_period("M").unique()
+    ).sort_values()
+    calibration_periods = label_periods[-6:]
+    calibration_start = calibration_periods.min()
+    proper_train_end = calibration_start - 4
 
-    current = table.loc[table["month"].eq(latest_month)].copy()
-    current["forecast_3m"] = model.predict(current[FULL_FEATURES])
+    proper_train = labeled.loc[
+        labeled["month"].dt.to_period("M").le(proper_train_end)
+    ].copy()
+    calibration = labeled.loc[
+        labeled["month"].dt.to_period("M").isin(calibration_periods)
+    ].copy()
 
-    residual_prediction = model.predict(labeled[FULL_FEATURES])
-    residual = np.abs(labeled[TARGET].to_numpy() - residual_prediction)
-    labeled = labeled.assign(abs_residual=residual)
+    calibration_model = elastic_net_model()
+    calibration_model.fit(
+        proper_train[FULL_FEATURES],
+        proper_train[TARGET],
+    )
+    calibration["abs_residual"] = np.abs(
+        calibration[TARGET].to_numpy()
+        - calibration_model.predict(calibration[FULL_FEATURES])
+    )
 
     cohort_radius = (
-        labeled.groupby("size_cohort")["abs_residual"]
+        calibration.groupby("size_cohort")["abs_residual"]
         .quantile(0.90)
         .to_dict()
     )
-    global_radius = float(labeled["abs_residual"].quantile(0.90))
+    global_radius = float(calibration["abs_residual"].quantile(0.90))
 
+    final_model = elastic_net_model()
+    final_model.fit(labeled[FULL_FEATURES], labeled[TARGET])
+
+    current = table.loc[table["month"].eq(latest_month)].copy()
+    current["forecast_3m"] = final_model.predict(current[FULL_FEATURES])
     current["forecast_radius"] = (
         current["size_cohort"].map(cohort_radius).fillna(global_radius)
     )
@@ -148,11 +167,15 @@ def build_dashboard_bundle(
         validate="one_to_one",
     )
 
-    scored["attention_score"] = (
-        scored["cooling_risk"].fillna(0) * 0.55
-        + scored["inventory_growth_12m"].clip(-0.5, 0.5).fillna(0).abs() * 0.15
-        + scored["price_cut_share"].fillna(0) * 0.15
-        + scored["forecast_radius"].fillna(0) * 3.0 * 0.15
+    risk_cutoff = scored["cooling_risk"].quantile(0.90)
+    scored["attention_tier"] = np.select(
+        [
+            scored["high_confidence_alert"].fillna(False),
+            scored["cooling_risk"].ge(risk_cutoff),
+            scored["forecast_upper"].lt(0),
+        ],
+        [0, 1, 2],
+        default=3,
     )
     scored["reliability"] = np.select(
         [
@@ -170,7 +193,10 @@ def build_dashboard_bundle(
     return DashboardBundle(
         mart=mart,
         model_table=table,
-        scored=scored.sort_values("attention_score", ascending=False),
+        scored=scored.sort_values(
+            ["attention_tier", "cooling_risk", "forecast_lower"],
+            ascending=[True, False, True],
+        ),
         latest_month=pd.Timestamp(scored["month"].max()),
         forecast_training_end=pd.Timestamp(forecast_training_end),
         alert_training_end=pd.Timestamp(alert_training_end),
