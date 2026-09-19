@@ -1,0 +1,53 @@
+name: Dashboard smoke test
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests and lint
+        run: |
+          ruff check .
+          pytest -q
+
+      - name: Download live Zillow Research data
+        run: python -m src.ingestion.download
+
+      - name: Build canonical mart
+        run: |
+          python -m src.transformation.build_interim
+          python -m src.transformation.build_mart
+
+      - name: Build live dashboard scoring bundle
+        run: |
+          python - <<'PY'
+          from dashboard.data import build_dashboard_bundle
+          bundle = build_dashboard_bundle()
+          print(bundle.latest_month)
+          print(bundle.scored.shape)
+          print(bundle.scored[["market_name", "rule_regime", "forecast_3m", "cooling_risk"]].head())
+          PY
+
+      - name: Compile dashboard modules
+        run: python -m compileall dashboard
