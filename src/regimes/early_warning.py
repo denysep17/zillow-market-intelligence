@@ -20,7 +20,6 @@ from src.features.model_table import FULL_FEATURES, build_model_table
 from src.forecasting.evaluation import purged_rolling_origin_folds
 from src.regimes.rules import build_rule_regimes
 
-
 ALERT_FEATURES = FULL_FEATURES + [
     "zhvi_growth_3m_pctile_regime",
     "inventory_growth_3m_pctile_regime",
