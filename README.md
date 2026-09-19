@@ -148,12 +148,13 @@ zillow-market-intelligence/
 - [x] Add balanced and precision-oriented alert policies
 
 ### v0.5 — Product dashboard
-- [ ] Executive market monitor
-- [ ] Market explorer
-- [ ] Metro deep dive
-- [ ] Drivers / explanations
-- [ ] Alerts
-- [ ] Model health
+- [x] Executive market monitor
+- [x] Market explorer
+- [x] Metro deep dive
+- [x] Drivers / explanations
+- [x] Alerts
+- [x] Model health
+- [x] Live scoring bundle + dashboard smoke test
 
 ### v1.0 — Portfolio release
 - [ ] Final model card
@@ -288,4 +289,33 @@ See:
 - [Forecasting findings](docs/forecasting_2026-09-18.md)
 - [Regimes and early-warning findings](docs/regimes_2026-09-19.md)
 
-Next: **v0.5 Product Dashboard** — turn the analytical system into an interactive executive monitor, market explorer, metro deep dive, driver view, alerts surface, and model-health page.
+## Product dashboard
+
+The v0.5 Plotly + Streamlit application now turns the analytical system into a live decision-support workflow:
+
+- **Executive Monitor** — regime mix, current forecast distribution, priority metros, and transition risk
+- **Market Explorer** — filter and compare metros across momentum, supply, and risk
+- **Metro Deep Dive** — forecast interval, historical conditions, diagnostics, and local Elastic Net feature contributions
+- **Alerts** — current precision-oriented cooling-transition alerts
+- **Model Health** — out-of-time benchmark performance, calibration, validation design, and visible limitations
+
+Current dashboard scoring is generated from the real Zillow mart at runtime. Forecast uncertainty is calibrated on a purged recent holdout window rather than in-sample residuals, and metro prioritization uses transparent tiers instead of an arbitrary weighted score.
+
+Run locally:
+
+```bash
+python -m src.ingestion.download
+python -m src.transformation.build_interim
+python -m src.transformation.build_mart
+streamlit run dashboard/app.py
+```
+
+## Current status
+
+**v0.1 Data Foundation: COMPLETE.**  
+**v0.2 Market Diagnostics: COMPLETE.**  
+**v0.3 Forecasting: COMPLETE.**  
+**v0.4 Regimes & Early Warning: COMPLETE.**  
+**v0.5 Product Dashboard: COMPLETE.**
+
+Next: **v1.0 Portfolio Release** — deployment, final failure analysis, publication-lag stress test, case-study polish, and a 60–90 second product demo.
