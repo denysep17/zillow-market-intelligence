@@ -4,7 +4,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-
 PLOT_CONFIG = {
     "displayModeBar": False,
     "responsive": True,
