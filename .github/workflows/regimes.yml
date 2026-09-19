@@ -41,8 +41,14 @@ jobs:
       - name: Run regime discovery
         run: python -m src.regimes.experiment
 
+      - name: Run cooling-transition early warning
+        run: python -m src.regimes.early_warning
+
       - name: Print regime report
         run: cat outputs/reports/regime_report.md
+
+      - name: Print early-warning summary
+        run: cat outputs/reports/early_warning_summary.json
 
       - name: Upload regime artifacts
         uses: actions/upload-artifact@v4
@@ -58,4 +64,8 @@ jobs:
             outputs/reports/rule_regime_transition_matrix.csv
             outputs/reports/cluster_regime_distribution.csv
             outputs/reports/cluster_regime_transition_matrix.csv
+            outputs/reports/early_warning_summary.json
+            outputs/reports/early_warning_by_fold.csv
+            outputs/reports/early_warning_by_cohort.csv
+            outputs/reports/early_warning_predictions.parquet
           retention-days: 14
