@@ -22,6 +22,7 @@ class DashboardBundle:
     mart: pd.DataFrame
     model_table: pd.DataFrame
     scored: pd.DataFrame
+    drivers: pd.DataFrame
     latest_month: pd.Timestamp
     forecast_training_end: pd.Timestamp
     alert_training_end: pd.Timestamp
@@ -35,7 +36,9 @@ def load_mart(
     return mart.sort_values(["market_id", "month"]).reset_index(drop=True)
 
 
-def _fit_latest_forecast(table: pd.DataFrame) -> tuple[pd.Timestamp, pd.DataFrame]:
+def _fit_latest_forecast(
+    table: pd.DataFrame,
+) -> tuple[pd.Timestamp, pd.DataFrame, pd.DataFrame]:
     latest_month = table["month"].max()
     labeled = table.loc[table[TARGET].notna()].copy()
     training_end = labeled["month"].max()
@@ -81,7 +84,33 @@ def _fit_latest_forecast(table: pd.DataFrame) -> tuple[pd.Timestamp, pd.DataFram
     )
     current["forecast_lower"] = current["forecast_3m"] - current["forecast_radius"]
     current["forecast_upper"] = current["forecast_3m"] + current["forecast_radius"]
-    return training_end, current
+
+    transformed = final_model[:-1].transform(current[FULL_FEATURES])
+    feature_names = final_model.named_steps["imputer"].get_feature_names_out(
+        FULL_FEATURES
+    )
+    coefficients = final_model.named_steps["model"].coef_
+    contribution_matrix = transformed * coefficients
+
+    driver_rows: list[dict[str, object]] = []
+    original_positions = [
+        idx for idx, name in enumerate(feature_names) if name in FULL_FEATURES
+    ]
+    for row_position, (_, row) in enumerate(current.iterrows()):
+        for feature_position in original_positions:
+            driver_rows.append(
+                {
+                    "market_id": int(row["market_id"]),
+                    "month": row["month"],
+                    "feature": str(feature_names[feature_position]),
+                    "contribution": float(
+                        contribution_matrix[row_position, feature_position]
+                    ),
+                }
+            )
+
+    drivers = pd.DataFrame(driver_rows)
+    return training_end, current, drivers
 
 
 def _fit_latest_transition_risk(
@@ -127,7 +156,7 @@ def build_dashboard_bundle(
     table = build_model_table(mart)
     table = build_rule_regimes(table)
 
-    forecast_training_end, forecast = _fit_latest_forecast(table)
+    forecast_training_end, forecast, drivers = _fit_latest_forecast(table)
     alert_training_end, alerts = _fit_latest_transition_risk(table)
 
     alert_cols = [
@@ -197,6 +226,7 @@ def build_dashboard_bundle(
             ["attention_tier", "cooling_risk", "forecast_lower"],
             ascending=[True, False, True],
         ),
+        drivers=drivers,
         latest_month=pd.Timestamp(scored["month"].max()),
         forecast_training_end=pd.Timestamp(forecast_training_end),
         alert_training_end=pd.Timestamp(alert_training_end),
@@ -227,5 +257,19 @@ def metro_history(
     return (
         table.loc[table["market_id"].eq(market_id), columns]
         .sort_values("month")
+        .reset_index(drop=True)
+    )
+
+
+def metro_drivers(
+    drivers: pd.DataFrame,
+    market_id: int,
+    top_n: int = 8,
+) -> pd.DataFrame:
+    frame = drivers.loc[drivers["market_id"].eq(market_id)].copy()
+    frame["abs_contribution"] = frame["contribution"].abs()
+    return (
+        frame.nlargest(top_n, "abs_contribution")
+        .sort_values("contribution")
         .reset_index(drop=True)
     )
