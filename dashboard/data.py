@@ -10,12 +10,11 @@ from src.features.model_table import FULL_FEATURES, TARGET, build_model_table
 from src.forecasting.models import elastic_net_model
 from src.regimes.early_warning import (
     ALERT_FEATURES,
-    _model as alert_model,
     _precision_target_threshold,
     add_cooling_entry_target,
 )
+from src.regimes.early_warning import _model as alert_model
 from src.regimes.rules import build_rule_regimes
-
 
 @dataclass(frozen=True)
 class DashboardBundle:
