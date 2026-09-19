@@ -16,6 +16,7 @@ from src.regimes.early_warning import (
 from src.regimes.early_warning import _model as alert_model
 from src.regimes.rules import build_rule_regimes
 
+
 @dataclass(frozen=True)
 class DashboardBundle:
     mart: pd.DataFrame
