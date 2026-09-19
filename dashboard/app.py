@@ -467,32 +467,61 @@ elif view == "Model Health":
         config=PLOT_CONFIG,
     )
 
+    st.subheader("Publication-lag sensitivity")
+    lag_table = pd.DataFrame(
+        {
+            "Scenario": [
+                "Contemporaneous",
+                "Non-price lag 1M",
+                "Non-price lag 2M",
+                "All dynamic lag 1M",
+            ],
+            "MAE": ["0.871 pp", "0.928 pp", "0.989 pp", "1.143 pp"],
+            "MAE degradation": ["0.0%", "+6.6%", "+13.5%", "+31.2%"],
+            "Direction": ["77.4%", "76.5%", "76.2%", "70.4%"],
+        }
+    )
+    st.dataframe(lag_table, hide_index=True, use_container_width=True)
+    st.caption(
+        "Stress scenarios test stale feature availability; they do not claim "
+        "a specific Zillow publication SLA."
+    )
+
     left, right = st.columns(2)
     with left:
-        st.subheader("Validation design")
+        st.subheader("Where forecast error increases")
         st.markdown(
             """
-            - 8 non-overlapping rolling-origin folds
-            - 3-month target-horizon purge
-            - No random train/test split
-            - Training-fold-only imputation
-            - Feature-family ablation
-            - Error analysis by metro-size cohort
+            - High-volatility quartile: **1.276 pp MAE**
+            - Cooling regime: **0.989 pp MAE**
+            - Rank-301+ metros: **0.952 pp MAE**
+            - Worst validation fold: **1.347 pp MAE**
             """
         )
     with right:
-        st.subheader("Known limitations")
+        st.subheader("Alert failure modes")
         st.markdown(
             """
-            - Zillow historical series can be revised
-            - Same-month feature publication lag requires sensitivity testing
-            - Metro-month observations are cross-sectionally dependent
-            - Smaller metros have wider forecast uncertainty
-            - Regime labels are operational constructs, not ground truth
+            - Precision policy recall: **19.8%**
+            - Realized cooling entries missed: **80.2%**
+            - False-alert share: **48.6%**
+            - Transition probability is a prioritization signal, not certainty
             """
         )
 
-    st.info(
-        "Next monitoring layer: explicit data drift, feature stability, "
-        "publication-lag stress tests, and model-version tracking."
+    st.subheader("Validation design")
+    st.markdown(
+        """
+        - 8 non-overlapping rolling-origin folds
+        - 3-month target-horizon purge
+        - No random train/test split
+        - Training-fold-only imputation
+        - Feature-family ablation
+        - Empirical uncertainty calibration by market-size cohort
+        """
+    )
+
+    st.warning(
+        "Reliability should be reduced for smaller metros, high-volatility "
+        "contexts, cooling regimes, or materially delayed input features."
     )

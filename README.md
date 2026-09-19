@@ -157,9 +157,11 @@ zillow-market-intelligence/
 - [x] Live scoring bundle + dashboard smoke test
 
 ### v1.0 — Portfolio release
-- [ ] Final model card
-- [ ] Failure analysis
-- [ ] Limitations
+- [x] Final model card
+- [x] Publication-lag stress test
+- [x] Forecast failure analysis
+- [x] Early-warning failure analysis
+- [x] Limitations
 - [ ] Deployment
 - [ ] Portfolio case study
 - [ ] 60–90 second product demo
@@ -318,4 +320,32 @@ streamlit run dashboard/app.py
 **v0.4 Regimes & Early Warning: COMPLETE.**  
 **v0.5 Product Dashboard: COMPLETE.**
 
-Next: **v1.0 Portfolio Release** — deployment, final failure analysis, publication-lag stress test, case-study polish, and a 60–90 second product demo.
+## Release hardening
+
+The v1.0 analytical release gate is complete.
+
+Publication-lag sensitivity for the selected Elastic Net forecast:
+
+| Scenario | MAE | Directional accuracy | MAE degradation |
+|---|---:|---:|---:|
+| Contemporaneous features | 0.871 pp | 77.4% | 0.0% |
+| Non-price signals lagged 1M | 0.928 pp | 76.5% | +6.6% |
+| Non-price signals lagged 2M | 0.989 pp | 76.2% | +13.5% |
+| All dynamic signals lagged 1M | 1.143 pp | 70.4% | +31.2% |
+
+These are operational stress scenarios, not claims about Zillow's actual publication SLA.
+
+Failure analysis identifies the contexts where confidence should be reduced:
+
+- high-volatility quartile: **1.276 pp MAE**
+- cooling regime: **0.989 pp MAE**
+- rank-301+ metros: **0.952 pp MAE**
+- worst validation fold: **1.347 pp MAE**
+- precision-oriented early-warning policy misses **80.2%** of realized cooling entries
+- **48.6%** of precision-oriented alerts are false positives
+
+This defines the operating envelope: use forecasts and transition probabilities for prioritization, preserve uncertainty, and lower trust in small/high-volatility markets and under delayed-data scenarios.
+
+See [release hardening findings](docs/release_hardening_2026-09-19.md).
+
+Next: **deployment + portfolio case study + 60–90 second demo**.

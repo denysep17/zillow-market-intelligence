@@ -2,13 +2,13 @@
 
 ## Status
 
-**Trained and evaluated — v0.3 forecasting candidate**
+**v1.0 analytical release candidate — evaluated, stress-tested, and integrated into the dashboard**
 
 Primary point-model candidate: **Elastic Net**
 
 Challenger: histogram gradient boosting.
 
-The primary model is not yet considered production-ready because regime-aware behavior, publication-lag sensitivity, and monitoring thresholds still need to be added.
+The system is a research and portfolio decision-support prototype, not a production Zillow system. Temporal validation, uncertainty calibration, regime analysis, alert-policy evaluation, publication-lag stress testing, and formal failure analysis are complete.
 
 ## Intended use
 
@@ -145,23 +145,59 @@ Size-cohort conditional calibration:
 
 Because metro-month observations are dependent across time and geography, these are empirical coverage measurements rather than claims of formal iid conformal guarantees.
 
+## Publication-lag stress test
+
+The original forecasting experiment assumes same-month features are available by the scoring cutoff. v1.0 explicitly stress-tests that assumption.
+
+These scenarios are sensitivity tests; they do not claim Zillow's actual publication SLA.
+
+| Scenario | MAE | Directional accuracy | MAE degradation vs current |
+|---|---:|---:|---:|
+| Contemporaneous | 0.871 pp | 77.4% | 0.0% |
+| Non-price signals lagged 1M | 0.928 pp | 76.5% | +6.6% |
+| Non-price signals lagged 2M | 0.989 pp | 76.2% | +13.5% |
+| All dynamic market signals lagged 1M | 1.143 pp | 70.4% | +31.2% |
+
+The system is reasonably robust to a one-month delay in non-price signals, but forecast quality degrades materially when the full dynamic information set is one month stale.
+
+## Forecast failure analysis
+
+Observed high-error contexts:
+
+- **high-volatility quartile:** 1.276 pp MAE
+- **cooling regime:** 0.989 pp MAE
+- **rank-301+ metros:** 0.952 pp MAE
+- **worst validation fold:** 1.347 pp MAE
+
+Worst metros with at least 20 validation observations include Greenville, MS; Clarksdale, MS; Murray, KY; Bennettsville, SC; and Indianola, MS. Several small markets have MAE above 2.5 pp, materially above the global result.
+
+## Early-warning failure analysis
+
+For the precision-oriented policy:
+
+- **80.2%** of realized cooling-entry events are missed
+- **48.6%** of emitted alerts are false positives
+
+The policy is therefore suitable for selective prioritization only. The transition probability should not be interpreted as a deterministic warning.
+
 ## Known limitations
 
 - Zillow may revise historical observations, creating vintage-data differences in retrospective evaluation.
-- Same-month features assume the signal is available by the scoring cutoff; publication-lag sensitivity still needs explicit evaluation.
+- Publication-lag sensitivity is scenario-tested, but source-specific availability timestamps and SLAs are not modeled.
 - Metro-month observations are cross-sectionally and temporally dependent.
 - Smaller Zillow-ranked metros have materially higher forecast error.
 - Performance varies across historical periods.
 - No causal interpretation should be made from coefficients, importance, or ablation.
 - Hyperparameters were intentionally fixed for the first benchmark experiment rather than tuned on the full sample.
 
-## Promotion criteria for the next version
+## Release position
 
-Before the forecasting model is used in the early-warning product layer:
+The project is suitable as a reproducible research and portfolio decision-support system.
 
-1. define interpretable housing-market regimes;
-2. evaluate error and interval coverage by regime;
-3. test publication-lag sensitivity;
-4. establish alert thresholds and reliability rules;
-5. quantify false alerts and lead time;
-6. document model-health monitoring behavior.
+A true production implementation would still require:
+
+1. archived source vintages or point-in-time snapshots;
+2. explicit publication timestamps and source-level availability SLAs;
+3. automated feature/data drift monitoring;
+4. model-version and threshold-version tracking;
+5. operational ownership for alert review and threshold changes.
