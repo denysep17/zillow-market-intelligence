@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-
 REGIME_FEATURES = [
     "zhvi_growth_3m",
     "inventory_growth_3m",
