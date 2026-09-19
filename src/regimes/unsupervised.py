@@ -7,7 +7,6 @@ from sklearn.metrics import silhouette_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-
 UNSUPERVISED_FEATURES = [
     "zhvi_growth_3m",
     "inventory_growth_3m",
