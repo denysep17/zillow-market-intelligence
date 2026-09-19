@@ -139,10 +139,13 @@ zillow-market-intelligence/
 - [x] Publish final forecasting findings
 
 ### v0.4 — Regimes & early warning
-- [ ] Define interpretable market states
-- [ ] Compare rule-based vs unsupervised regimes
-- [ ] Model regime transitions
-- [ ] Measure alert precision, false positives, and lead time
+- [x] Define interpretable market states
+- [x] Compare rule-based vs unsupervised regimes
+- [x] Measure state persistence and forward-outcome separation
+- [x] Model 1–3 month cooling-entry risk
+- [x] Measure precision / recall / false alerts
+- [x] Measure realized alert lead time
+- [x] Add balanced and precision-oriented alert policies
 
 ### v0.5 — Product dashboard
 - [ ] Executive market monitor
@@ -247,4 +250,42 @@ See:
 - [Market diagnostics findings](docs/market_diagnostics_2026-09-18.md)
 - [Forecasting findings](docs/forecasting_2026-09-18.md)
 
-Next: **v0.4 Regimes & Early Warning** — define interpretable market states, compare rule-based and unsupervised regimes, model transitions, and measure alert precision / false positives / lead time.
+## Regimes & early warning
+
+The regime layer is now live.
+
+The transparent rule system produces five states:
+
+`accelerating · tightening · balanced · loosening · cooling`
+
+Rule-based states are more persistent than the unsupervised KMeans comparator:
+
+- Rule-based one-month persistence: **77.0%**
+- KMeans one-month persistence: **66.2%**
+- KMeans silhouette score: **0.194**
+
+The states also separate forward outcomes. Markets classified as accelerating average **+2.27%** forward 3-month ZHVI growth, while cooling markets average **+0.67%** and have a **34.8%** probability of negative forward growth.
+
+For transition risk, the early-warning model predicts entry into a cooling state within the next 1–3 months.
+
+Two alert policies are retained:
+
+- **Balanced/F1 policy:** 33.8% precision, 62.7% recall, median lead time 2 months
+- **Precision-oriented policy:** 51.4% precision, 19.8% recall, median lead time 1 month
+
+The ranking signal is meaningful (ROC AUC **0.804**, average precision **0.389** vs. a 12.9% event rate), but the alert trade-off is explicit: higher precision materially reduces recall.
+
+## Current status
+
+**v0.1 Data Foundation: COMPLETE.**  
+**v0.2 Market Diagnostics: COMPLETE.**  
+**v0.3 Forecasting: COMPLETE.**  
+**v0.4 Regimes & Early Warning: COMPLETE.**
+
+See:
+- [Final data audit](docs/data_audit_2026-09-18.md)
+- [Market diagnostics findings](docs/market_diagnostics_2026-09-18.md)
+- [Forecasting findings](docs/forecasting_2026-09-18.md)
+- [Regimes and early-warning findings](docs/regimes_2026-09-19.md)
+
+Next: **v0.5 Product Dashboard** — turn the analytical system into an interactive executive monitor, market explorer, metro deep dive, driver view, alerts surface, and model-health page.
