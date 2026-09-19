@@ -8,6 +8,7 @@ import streamlit as st
 from dashboard.charts import (
     PLOT_CONFIG,
     cooling_risk_histogram,
+    driver_contributions,
     forecast_interval_chart,
     market_matrix,
     metro_market_signals,
@@ -15,7 +16,7 @@ from dashboard.charts import (
     model_health_mae,
     regime_distribution,
 )
-from dashboard.data import build_dashboard_bundle, metro_history
+from dashboard.data import build_dashboard_bundle, metro_drivers, metro_history
 from dashboard.theme import apply_theme, page_header
 
 st.set_page_config(
@@ -338,6 +339,18 @@ elif view == "Metro Deep Dive":
             }
         )
         st.dataframe(diag, hide_index=True, use_container_width=True)
+
+    st.subheader("What is moving the point forecast?")
+    st.caption(
+        "Largest Elastic Net feature contributions for this metro. "
+        "These are predictive contributions, not causal effects."
+    )
+    local_drivers = metro_drivers(bundle.drivers, market_id)
+    st.plotly_chart(
+        driver_contributions(local_drivers),
+        use_container_width=True,
+        config=PLOT_CONFIG,
+    )
 
 elif view == "Alerts":
     page_header(
