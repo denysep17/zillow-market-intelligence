@@ -18,7 +18,6 @@ from dashboard.charts import (
 from dashboard.data import build_dashboard_bundle, metro_history
 from dashboard.theme import apply_theme, page_header
 
-
 st.set_page_config(
     page_title="Zillow Market Intelligence",
     page_icon="🏠",
@@ -276,7 +275,7 @@ elif view == "Metro Deep Dive":
             + x["state_name"].fillna("")
         )
     )
-    label_to_id = dict(zip(choices["label"], choices["market_id"]))
+    label_to_id = dict(zip(choices["label"], choices["market_id"], strict=True))
     selected_label = st.selectbox("Metro", list(label_to_id))
     market_id = int(label_to_id[selected_label])
 
