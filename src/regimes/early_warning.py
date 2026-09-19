@@ -40,13 +40,17 @@ def add_cooling_entry_target(
         future_state = out.groupby("market_id")["rule_regime"].shift(-step)
         future_cooling.append(future_state.eq("cooling"))
 
-    out["cooling_entry_next_3m"] = np.logical_or.reduce(future_cooling)
+    out["cooling_entry_next_3m"] = pd.Series(
+        np.logical_or.reduce(future_cooling),
+        index=out.index,
+        dtype="boolean",
+    )
     out["eligible_alert_row"] = ~out["rule_regime"].eq("cooling")
 
     future_available = out.groupby("market_id")["rule_regime"].shift(
         -horizon_months
     ).notna()
-    out.loc[~future_available, "cooling_entry_next_3m"] = np.nan
+    out.loc[~future_available, "cooling_entry_next_3m"] = pd.NA
     return out
 
 
