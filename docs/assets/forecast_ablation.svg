@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="620" viewBox="0 0 1100 620">
+<rect width="1100" height="620" fill="#F7F8FA"/>
+<text x="55" y="52" font-family="Inter,Arial,sans-serif" font-size="29" font-weight="700" fill="#111827">Which signal families add predictive value?</text>
+<text x="55" y="80" font-family="Inter,Arial,sans-serif" font-size="14" fill="#667085">Elastic Net feature-family ablation · out-of-time MAE · lower is better</text>
+<line x1="720" y1="108" x2="720" y2="554" stroke="#D0D5DD" stroke-width="1" stroke-dasharray="4 4"/>
+<text x="720" y="580" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="12" fill="#667085">price-only MAE ≈ 1.009 pp</text>
+<g font-family="Inter,Arial,sans-serif" font-size="14">
+<text x="55" y="137" fill="#344054">Full without rent</text><rect x="300" y="116" width="337" height="28" rx="5" fill="#006AFF"/><text x="650" y="137" fill="#101828" font-weight="600">0.871</text>
+<text x="55" y="191" fill="#344054">Full</text><rect x="300" y="170" width="337" height="28" rx="5" fill="#006AFF" opacity="0.78"/><text x="650" y="191" fill="#101828" font-weight="600">0.871</text>
+<text x="55" y="245" fill="#344054">Full without supply</text><rect x="300" y="224" width="347" height="28" rx="5" fill="#98A2B3"/><text x="660" y="245" fill="#101828" font-weight="600">0.895</text>
+<text x="55" y="299" fill="#344054">Price + liquidity</text><rect x="300" y="278" width="347" height="28" rx="5" fill="#12B76A"/><text x="660" y="299" fill="#101828" font-weight="600">0.895</text>
+<text x="55" y="353" fill="#344054">Price + supply</text><rect x="300" y="332" width="352" height="28" rx="5" fill="#12B76A" opacity="0.72"/><text x="665" y="353" fill="#101828" font-weight="600">0.909</text>
+<text x="55" y="407" fill="#344054">Full without liquidity</text><rect x="300" y="386" width="353" height="28" rx="5" fill="#98A2B3"/><text x="666" y="407" fill="#101828" font-weight="600">0.911</text>
+<text x="55" y="461" fill="#344054">Price + rent</text><rect x="300" y="440" width="389" height="28" rx="5" fill="#F79009"/><text x="702" y="461" fill="#101828" font-weight="600">1.005</text>
+<text x="55" y="515" fill="#344054">Price only</text><rect x="300" y="494" width="391" height="28" rx="5" fill="#98A2B3"/><text x="704" y="515" fill="#101828" font-weight="600">1.009</text>
+</g>
+<text x="55" y="595" font-family="Inter,Arial,sans-serif" font-size="13" fill="#667085">Liquidity and supply drive most incremental lift; rent is largely redundant after the other signals are present.</text>
+</svg>
