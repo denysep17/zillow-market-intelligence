@@ -11,7 +11,6 @@ import pandas as pd
 from src.features.model_table import (
     FULL_FEATURES,
     LIQUIDITY_FEATURES,
-    PRICE_FEATURES,
     RENT_FEATURES,
     SUPPLY_FEATURES,
     TARGET,
