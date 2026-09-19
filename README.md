@@ -128,12 +128,15 @@ zillow-market-intelligence/
 - [x] Lock feature hypotheses for forecasting
 
 ### v0.3 — Forecasting
-- [ ] Define leakage-safe feature set
-- [ ] Build naive and autoregressive baselines
-- [ ] Add Elastic Net benchmark
-- [ ] Add gradient-boosting model
-- [ ] Implement rolling-origin evaluation
-- [ ] Add uncertainty intervals
+- [x] Define leakage-safe feature set
+- [x] Build naive and autoregressive baselines
+- [x] Add Elastic Net benchmark
+- [x] Add gradient-boosting challenger
+- [x] Implement target-horizon-purged rolling-origin evaluation
+- [x] Run feature-family ablation
+- [x] Add empirical uncertainty intervals
+- [x] Add size-cohort conditional calibration
+- [x] Publish final forecasting findings
 
 ### v0.4 — Regimes & early warning
 - [ ] Define interpretable market states
@@ -202,15 +205,46 @@ bash scripts/build_v01_data.sh
 
 The raw downloads are not committed to Git. Each run records source URL, timestamp, file size, and SHA-256 hash in the local download manifest.
 
+## Forecasting result
+
+The first out-of-time forecasting experiment is complete.
+
+![Forecast MAE](docs/assets/forecast_mae.svg)
+
+Across 42,910 validation predictions and 8 purged rolling-origin folds:
+
+- Full Elastic Net MAE: **0.871 pp**
+- Gradient boosting MAE: **0.907 pp**
+- Price-only Ridge MAE: **1.010 pp**
+- Trailing-momentum MAE: **1.307 pp**
+- Elastic Net improves MAE by **13.8% vs. price-only Ridge**
+- Elastic Net improves MAE by **33.4% vs. trailing momentum**
+
+The more complex nonlinear model does not win. At this stage, the regularized linear model is the stronger default.
+
+### What adds predictive value?
+
+![Feature ablation](docs/assets/forecast_ablation.svg)
+
+Out-of-time ablation shows that supply and liquidity features provide most of the incremental lift beyond price history. Rent momentum is descriptively useful, but largely redundant once the rest of the feature set is present.
+
+### Uncertainty is market-dependent
+
+![Uncertainty calibration](docs/assets/forecast_uncertainty.svg)
+
+One global interval overcovers larger metros and undercovers smaller ones. Size-cohort conditional calibration brings empirical coverage much closer to the 90% target while widening intervals where forecast error is structurally larger.
+
 ## Current status
 
 **v0.1 Data Foundation: COMPLETE.**  
-**v0.2 Market Diagnostics: COMPLETE.**
+**v0.2 Market Diagnostics: COMPLETE.**  
+**v0.3 Forecasting: COMPLETE.**
 
-The live market-diagnostics pipeline now covers cross-market trends, seasonality, Zillow size-rank cohorts, synchronized-shift candidates, pooled lead-lag screening, and a stronger within-month / within-market correlation decomposition.
+The project now has a reproducible data foundation, market diagnostics, a leakage-safe forecasting benchmark, feature-family ablation, temporal stability analysis, and calibrated empirical uncertainty.
 
-Key empirical result: recent ZHVI momentum is the dominant baseline, while ZORI momentum is the strongest non-price signal that remains meaningful when metros are compared within the same month. Inventory, price cuts, and Market Heat appear more regime-sensitive than purely cross-sectional.
+See:
+- [Final data audit](docs/data_audit_2026-09-18.md)
+- [Market diagnostics findings](docs/market_diagnostics_2026-09-18.md)
+- [Forecasting findings](docs/forecasting_2026-09-18.md)
 
-See [the final data audit](docs/data_audit_2026-09-18.md) and [market diagnostics findings](docs/market_diagnostics_2026-09-18.md).
-
-Next: **v0.3 Forecasting** — build the leakage-safe feature table, establish naive and autoregressive baselines, then compare Elastic Net and gradient boosting under rolling-origin validation.
+Next: **v0.4 Regimes & Early Warning** — define interpretable market states, compare rule-based and unsupervised regimes, model transitions, and measure alert precision / false positives / lead time.
