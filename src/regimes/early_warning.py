@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +16,7 @@ from sklearn.metrics import (
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from src.features.model_table import FULL_FEATURES
+from src.features.model_table import FULL_FEATURES, build_model_table
 from src.forecasting.evaluation import purged_rolling_origin_folds
 from src.regimes.rules import build_rule_regimes
 
@@ -230,3 +231,23 @@ def run_early_warning(
 
     print(json.dumps(summary, indent=2))
     return summary
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Run cooling-transition early-warning evaluation."
+    )
+    parser.add_argument(
+        "--mart",
+        default="data/processed/mart_market_monthly.parquet",
+    )
+    parser.add_argument("--output-dir", default="outputs/reports")
+    args = parser.parse_args()
+
+    mart = pd.read_parquet(args.mart)
+    table = build_model_table(mart)
+    run_early_warning(table, args.output_dir)
+
+
+if __name__ == "__main__":
+    main()
