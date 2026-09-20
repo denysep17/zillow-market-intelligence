@@ -16,7 +16,12 @@ from dashboard.charts import (
     model_health_mae,
     regime_distribution,
 )
-from dashboard.data import build_dashboard_bundle, metro_drivers, metro_history
+from dashboard.data import (
+    build_dashboard_bundle,
+    load_dashboard_bundle,
+    metro_drivers,
+    metro_history,
+)
 from dashboard.theme import apply_theme, page_header
 
 st.set_page_config(
@@ -30,6 +35,9 @@ apply_theme()
 
 @st.cache_resource(show_spinner=False)
 def get_bundle():
+    snapshot = Path("data/processed/dashboard_bundle.pkl")
+    if snapshot.exists():
+        return load_dashboard_bundle(snapshot)
     return build_dashboard_bundle()
 
 
@@ -47,7 +55,7 @@ def require_data():
 
 require_data()
 
-with st.spinner("Scoring current market conditions..."):
+with st.spinner("Loading market intelligence..."):
     bundle = get_bundle()
 
 scored = bundle.scored.copy()

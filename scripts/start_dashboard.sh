@@ -2,6 +2,7 @@
 set -euo pipefail
 
 echo "Preparing Zillow Market Intelligence dashboard..."
+export PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}"
 
 if [ ! -f "data/processed/mart_market_monthly.parquet" ]; then
   echo "Canonical mart not found. Building from current Zillow Research releases..."
@@ -10,8 +11,12 @@ if [ ! -f "data/processed/mart_market_monthly.parquet" ]; then
   python -m src.transformation.build_mart
 fi
 
+if [ ! -f "data/processed/dashboard_bundle.pkl" ]; then
+  echo "Precomputing dashboard scoring snapshot..."
+  python scripts/precompute_dashboard.py
+fi
+
 echo "Starting Streamlit..."
-export PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}"
 exec streamlit run dashboard/app.py \
   --server.address=0.0.0.0 \
   --server.port="${PORT:-8501}" \
