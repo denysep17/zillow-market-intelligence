@@ -11,6 +11,7 @@ if [ ! -f "data/processed/mart_market_monthly.parquet" ]; then
 fi
 
 echo "Starting Streamlit..."
+export PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}"
 exec streamlit run dashboard/app.py \
   --server.address=0.0.0.0 \
   --server.port="${PORT:-8501}" \
