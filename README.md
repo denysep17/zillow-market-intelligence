@@ -21,6 +21,33 @@ Primary users:
 - Data scientists and analysts investigating market changes
 - Business stakeholders who need concise, interpretable market signals
 
+
+## Product walkthrough
+
+### Executive Monitor
+
+Portfolio-level overview of regime mix, near-term momentum, uncertainty, transition risk, and priority metros.
+
+![Executive Monitor](docs/assets/Executive%20Monitor%20.png)
+
+### Metro Deep Dive — Seattle
+
+Seattle illustrates why the product combines point forecasts with regime context and uncertainty: the market is currently classified as cooling, with a slightly positive 3-month forecast but materially weaker underlying conditions.
+
+![Metro Deep Dive — Seattle](docs/assets/MetroDeepDive.png)
+
+### Alerts
+
+Precision-oriented cooling-transition alerts make the operating trade-off explicit rather than presenting a binary warning as certainty.
+
+![Alerts](docs/assets/Alerts.png)
+
+### Model Health
+
+Out-of-time performance, calibration, publication-lag sensitivity, and known failure modes are exposed alongside the product rather than hidden in a notebook.
+
+![Model Health](docs/assets/Model%20Health.png)
+
 ## What this project demonstrates
 
 - end-to-end data science ownership from ingestion to deployed product
@@ -180,7 +207,7 @@ zillow-market-intelligence/
 - [x] Live deployment
 - [x] Portfolio case study
 - [x] 60–90 second product demo script
-- [ ] GitHub v1.0.0 release/tag
+- [x] GitHub v1.0.0 release/tag
 
 ## Scientific guardrails
 
@@ -369,5 +396,4 @@ See [release hardening findings](docs/release_hardening_2026-09-19.md).
 **Live deployment: COMPLETE.**  
 **Case study: COMPLETE.**  
 **Demo script: COMPLETE.**  
-
-The remaining repository-level release step is the GitHub `v1.0.0` tag/release.
+**GitHub v1.0.0 release/tag: COMPLETE.**
