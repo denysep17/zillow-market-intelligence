@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import pickle
 
 import numpy as np
 import pandas as pd
@@ -273,3 +274,25 @@ def metro_drivers(
         .sort_values("contribution")
         .reset_index(drop=True)
     )
+
+
+def save_dashboard_bundle(
+    bundle: DashboardBundle,
+    path: str | Path = "data/processed/dashboard_bundle.pkl",
+) -> Path:
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("wb") as handle:
+        pickle.dump(bundle, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    return output
+
+
+def load_dashboard_bundle(
+    path: str | Path = "data/processed/dashboard_bundle.pkl",
+) -> DashboardBundle:
+    snapshot = Path(path)
+    with snapshot.open("rb") as handle:
+        bundle = pickle.load(handle)
+    if not isinstance(bundle, DashboardBundle):
+        raise TypeError("Dashboard snapshot does not contain DashboardBundle")
+    return bundle
