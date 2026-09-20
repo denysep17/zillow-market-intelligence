@@ -2,6 +2,10 @@
 
 An early-warning housing-market intelligence system designed to detect market regime shifts, forecast near-term momentum, explain predictive signals, and surface markets that deserve analyst attention.
 
+**Live dashboard:** https://dashboard-production-b1bb.up.railway.app
+
+**Portfolio case study:** [docs/portfolio_case_study.md](docs/portfolio_case_study.md) · **90-second demo script:** [docs/demo_script.md](docs/demo_script.md)
+
 > **Research question:** Can leading housing-market signals identify turning points before headline home-value measures fully reflect them?
 
 ## Product
@@ -16,6 +20,17 @@ Primary users:
 - Product and strategy teams monitoring market conditions
 - Data scientists and analysts investigating market changes
 - Business stakeholders who need concise, interpretable market signals
+
+## What this project demonstrates
+
+- end-to-end data science ownership from ingestion to deployed product
+- temporal validation with target-horizon purging instead of random splitting
+- forecasting benchmark discipline and model-complexity restraint
+- uncertainty calibration and heterogeneous error analysis
+- interpretable regime design plus transition-risk modeling
+- explicit alert-policy precision/recall trade-offs
+- publication-lag stress testing and failure-mode analysis
+- production-minded CI, deployment, health checks, and live model-health communication
 
 ## Why this matters
 
@@ -72,7 +87,7 @@ Model monitoring
 - **Testing:** pytest + data-quality assertions
 - **CI:** GitHub Actions
 
-## Planned data
+## Data
 
 The project will use publicly available Zillow Research datasets at compatible geographic and temporal grains, including where available:
 
@@ -162,9 +177,10 @@ zillow-market-intelligence/
 - [x] Forecast failure analysis
 - [x] Early-warning failure analysis
 - [x] Limitations
-- [ ] Deployment
-- [ ] Portfolio case study
-- [ ] 60–90 second product demo
+- [x] Live deployment
+- [x] Portfolio case study
+- [x] 60–90 second product demo script
+- [ ] GitHub v1.0.0 release/tag
 
 ## Scientific guardrails
 
@@ -348,4 +364,10 @@ This defines the operating envelope: use forecasts and transition probabilities 
 
 See [release hardening findings](docs/release_hardening_2026-09-19.md).
 
-Next: **deployment + portfolio case study + 60–90 second demo**.
+## Portfolio release status
+
+**Live deployment: COMPLETE.**  
+**Case study: COMPLETE.**  
+**Demo script: COMPLETE.**  
+
+The remaining repository-level release step is the GitHub `v1.0.0` tag/release.
